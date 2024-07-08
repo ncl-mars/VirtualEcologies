@@ -1,0 +1,16 @@
+#pragma kernel CSPostPro
+
+Texture2D<float4> _Source;
+
+
+
+
+///////////////////////////////////////////////////////////////////////////
+[numthreads(8,8,1)]
+void CSPostPro (uint3 id : SV_DispatchThreadID)
+{
+    // _Destination[id.xy] = _LastCameraDepthTexture[id.xy] * 10.0;
+
+    // _Destination[id.xy] = _Source[id.xy];
+    // _Destination[id.xy] = ExtrudeScene(id);
+}

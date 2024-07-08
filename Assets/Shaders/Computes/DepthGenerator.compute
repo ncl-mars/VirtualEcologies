@@ -1,0 +1,204 @@
+/*
+    software bilinear
+    REMOVED HW => float height = _DepthTex.SampleLevel(sampler_DepthTex, uv, 0).r;
+*/
+#pragma kernel CSNormalsDepth
+#pragma kernel CSPathDepth
+#pragma kernel CSPlateformDepth
+
+#define THREAD_GROUP_SIZE 128
+
+//-------------------------- Uniforms
+float _TargetWidth, _TargetHeight;
+
+float _FieldWidth, _FieldHeight;
+float _DepthWidth, _DepthHeight;
+
+bool _DepthClamp;
+
+Texture2D _DepthTex;
+
+RWStructuredBuffer<float4> _Colors;
+StructuredBuffer<float4> _Path;
+
+StructuredBuffer<float2> _NorDt;
+
+//--------------------------- Import libs
+#define TARGET_DIM float3(_TargetWidth, _TargetHeight, 1)
+#include "../Includes/Generators.hlsl"
+#include "../Includes/Interpolators.hlsl"
+
+
+//--------------------------- Compute's methods
+float GetHeight(float2 uv){
+
+    // height in coord system [-1, 1]
+    float2 fres = float2(_DepthWidth, _DepthHeight);
+
+    if(_DepthClamp)
+        return FetchBilinear(_DepthTex, uv, fres).r * 2.0 - 1.0;
+    else
+        return FetchBilinear(_DepthTex, uv, fres).r;
+}
+
+float Map(float3 pos){
+
+    float height = GetHeight(pos.xy * 0.5 + 0.5);
+    return pos.z - height;
+}
+
+float3 CalcNormal( in float3 pos){
+
+    const float eps = 0.005;
+    float2 e = float2(1.0,-1.0)*0.5773*eps;
+    return normalize(   e.xyy * Map( pos + e.xyy ) + 
+                        e.yyx * Map( pos + e.yyx ) + 
+                        e.yxy * Map( pos + e.yxy ) + 
+                        e.xxx * Map( pos + e.xxx ) );
+}
+
+float parabola( float x, float k ){
+
+    return pow( 4.0*x*(1.0-x), k );
+}
+
+////////////////////////////////////////////////////////////////////////////////
+[numthreads(THREAD_GROUP_SIZE,1,1)]
+void CSNormalsDepth (uint3 id : SV_DispatchThreadID){
+
+    uint2 pixel = IdtToPtc(id.x);
+    float2 ntc = PtcToNtc(pixel);
+
+    float height = GetHeight(ntc * 0.5 + 0.5);
+    float3 pos = float3(ntc, height);
+    float3 nor = CalcNormal(pos);
+    
+    _Colors[id.x] = float4(nor, height);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+[numthreads(THREAD_GROUP_SIZE,1,1)]
+void CSPathDepth (uint3 id : SV_DispatchThreadID){
+
+    uint2 pixel = IdtToPtc(id.x);
+    float2 ntc = PtcToNtc(pixel);
+    float height = GetHeight(ntc * 0.5 + 0.5);
+
+    float4 path = _Path[id.x];
+    
+    float dist  = length(path.ba);
+    float2 nor2 = normalize(path.rg);
+    
+    float2 flow2 = normalize(path.ba);
+
+    path.rg = nor2 * dist;
+
+    height = max(height * 0.5 + 0.5, 0.001);
+    path.ba = flow2 * height;
+    
+    _Colors[id.x] = path;
+}
+
+
+float PlateformHeight(uint2 pixel)
+{
+    float d = length(_NorDt[PtcToIdt(pixel)]) * 2 - 1;
+    float height = parabola(saturate(d * -0.5), 0.25);
+    return height;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+[numthreads(THREAD_GROUP_SIZE,1,1)]
+void CSPlateformDepth (uint3 id : SV_DispatchThreadID){
+
+    uint2 pixel = IdtToPtc(id.x);
+    float2 ntc = PtcToNtc(pixel);
+
+    float2 norDt = _NorDt[id.x];
+    
+    float dist  = length(norDt) * 2 - 1;
+    float2 nor2 = normalize(norDt);
+
+    float height = PlateformHeight(pixel);
+
+    const int3 off = int3(-1,0,1);
+    const float eps = 0.005;
+    const float2 size = float2(eps,0.0);
+
+    float s01 = PlateformHeight(pixel + off.xy);
+    float s21 = PlateformHeight(pixel + off.zy);
+    float s10 = PlateformHeight(pixel + off.yx);
+    float s12 = PlateformHeight(pixel + off.yz);
+
+    float3 va = normalize(float3(size.xy,(s21-s01)));
+    float3 vb = normalize(float3(size.yx,(s12-s10)));
+
+    float3 nor = normalize(cross(va,vb));
+
+    float4 col;
+    col.rgb = nor;
+    col.rgb *= length(norDt);
+    col.a = height;
+
+    _Colors[id.x] = col;
+}
+
+
+
+
+
+
+
+//____________________________________________________________________________________________
+    //--------------------------------------------- Get path field
+    // float2 fieldDim = float2(_FieldWidth, _FieldHeight);
+    // float4 field    = _FieldTex[PtcToPic(pixel, fieldDim)];
+
+    // float2 nor2  = normalize(field.rg);
+    // float2 flow2 = normalize(field.ba);
+
+    // float dtShp  = length(field.rg) * 2 - 1;
+    // float dtFlow = length(field.ba) * 2 - 1;
+
+    // float curveSide = sign(dtFlow);
+
+    //--------------------------------------------- Mix 2D Flows
+    // float theta;   
+    // float2 flowNor = 0;
+    // theta = -curveSide * PI/2;
+    // flowNor.xy = mul( Rot2(theta), nor2.xy);
+
+    // mix flow from rotated normals and path dir
+    // flow2 = lerp(flow2, flowNor, clamp(abs(dtFlow) * 25.0, 0.1,0.9));
+    // flow2 = normalize(flow2);
+
+    // field.ba = flow2 * length(field.ba);
+
+
+    //--------------------------------------------- create 3D Flow
+    // float spread = 0.05;
+    // uv = ntc + flow2 * spread;
+    // float nhght = _DepthTex.SampleLevel(sampler_DepthTex, uv * 0.5 + 0.5, 0).r;
+    // uv = ntc - flow2 * spread;
+    // float phght = _DepthTex.SampleLevel(sampler_DepthTex, uv * 0.5 + 0.5, 0).r;
+    // float diff = nhght - phght;
+    // diff *= 100;
+    // float3 flow3 = float3(flow2, diff);
+    // flow3 = normalize(flow3);
+
+    //--------------------------------------------- Encode
+    // float4 rgba = float4(nor3  * max(height, 0.000001),  1);
+    // float4 rgba1 = float4(flow3 * length(field.ba), 0);
+    // float4 rgba1 = field;
+    
+    // _Colors[id.x] = Pack8to16(rgba0, field);
+    // _Colors[id.x] = field;
+
+
+
+    // }
+
+
+
+
+    // _Colors[id.x] = float4(nor, 1);

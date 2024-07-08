@@ -1,0 +1,151 @@
+/*
+// https://www.shadertoy.com/view/4ttSWf
+*/
+#pragma kernel CSPerlin
+#pragma kernel CSFractal
+#pragma kernel CSFractalGrad
+#pragma kernel CSFbm
+#pragma kernel CSFbmDerivatives
+
+#define _THREAD_GROUP_SIZE 128
+
+RWStructuredBuffer<float>_Result1;
+RWStructuredBuffer<float4>_Result4;
+
+#include "../Includes/Noises/Gradients.hlsl"
+
+float4 _Resolution;
+float _Scale;
+int _Depth;
+
+bool _Normalized;
+bool _NoiseToAlpha; // todo
+
+
+// #define NB_PARAMS 2
+// float4 _Params[NB_PARAMS];
+
+
+#define VoxelToPos(voxel) (2 * voxel - _Resolution.xyz)/_Resolution.y
+#define VoxelToId(voxel) voxel.x + voxel.y * _Resolution.x + voxel.z * (_Resolution.x * _Resolution.y)
+
+#define M3  float3x3(0.00, 0.80, 0.60, -0.80,0.36,-0.48, -0.60,-0.48,0.64)
+#define M3i float3x3(0.00,-0.80,-0.60,  0.80,0.36,-0.48,  0.60,-0.48,0.64)
+
+uint3 To3D(uint id){
+
+	uint xQ = id / (uint)(_Resolution.x);
+	uint x 	= id % (uint)(_Resolution.x);
+	uint y 	= xQ % (uint)(_Resolution.y);
+    return uint3(x, y, _Depth);
+}
+
+//////////////////////////////////////////////////////////////////////////////// A
+[numthreads(_THREAD_GROUP_SIZE,1,1)]
+void CSPerlin (uint3 id : SV_DispatchThreadID){
+
+    uint3 vox = To3D(id.x);
+    float3 pos = VoxelToPos(vox);
+
+    float f = CNoise3(pos * _Scale);
+
+    if(_Normalized) f = f * 0.5 + 0.5;
+    _Result1[id.x] = f;
+}
+
+//////////////////////////////////////////////////////////////////////////////// B
+[numthreads(_THREAD_GROUP_SIZE,1,1)]
+void CSFractal (uint3 id : SV_DispatchThreadID){
+
+    uint3 vox = To3D(id.x);
+    float3 pos = VoxelToPos(vox);
+
+    const float3x3 m = float3x3( 0.00,  0.80,  0.60,
+                                -0.80,  0.36, -0.48,
+                                -0.60, -0.48,  0.64 );
+
+    float3 q = pos + float3(125.12, 24.1, -125.95);
+    q *= _Scale;
+
+    float f;
+    f  = 0.5000*SNoise3( q ); q = mul(m,q)*2.01;
+    f += 0.2500*SNoise3( q ); q = mul(m,q)*2.02;
+    f += 0.1250*SNoise3( q ); q = mul(m,q)*2.03;
+    f += 0.0625*SNoise3( q ); q = mul(m,q)*2.01; 
+ 
+    if(_Normalized) f = f * 0.5 + 0.5;
+    _Result1[id.x] = f;
+}
+
+//////////////////////////////////////////////////////////////////////////////// C
+// https://www.shadertoy.com/view/4ttSWf
+[numthreads(_THREAD_GROUP_SIZE,1,1)]
+void CSFractalGrad (uint3 id : SV_DispatchThreadID){
+
+    uint3 vox = To3D(id.x);
+    float3 pos = VoxelToPos(vox);
+
+    float3x3 m = float3x3(
+        1.0,0.0,0.0,
+        0.0,1.0,0.0,
+        0.0,0.0,1.0
+    );
+
+    float3 q = pos + float3(125.12, 24.1, -125.95);
+    q *= _Scale;
+
+    float f [4] = {2.01, 2.02, 2.03, 2.01}; // Freqs
+    float a = 0.5;  // Scale Amp
+    
+    float s = a;    // Scale Accu, Init Octave 0 = a
+    float n = 0;    // Noise Accu
+    float3 g = 0;   // Gradient Accu
+
+    for(int i = 0; i < 4; i++)
+    {
+        float3 grad;
+        n += s * SNoiseGrad3(q, grad);
+        g += s * grad;
+        
+        q = mul(M3,q) * f[i];
+        s *= a;
+    }
+
+    float4 col = float4(n, g);
+    if(_Normalized) col = col * 0.5 + 0.5;
+
+    _Result4[id.x] = _NoiseToAlpha ? col.yzwx : col;
+}
+
+//////////////////////////////////////////////////////////////////////////////// D
+[numthreads(_THREAD_GROUP_SIZE,1,1)]
+void CSFbm (uint3 id : SV_DispatchThreadID)
+{
+
+    _Result4[id.x] = 0.5;
+}
+
+//////////////////////////////////////////////////////////////////////////////// E
+// https://www.shadertoy.com/view/XttSz2
+[numthreads(_THREAD_GROUP_SIZE,1,1)]
+void CSFbmDerivatives (uint3 id : SV_DispatchThreadID){
+
+    uint3 vox = To3D(id.x);
+    float3 pos = VoxelToPos(vox);
+
+    float3 q = pos; 
+    q += float3(0.25, 0.5, -0.1) * 4;
+    q *= _Scale;
+
+    float4 d1 = FbmD(q, 4);
+    // d1.x -= 0.37; 
+    // d1.x *= 0.7;
+    
+    d1.yzw *= -1.0; // d1.yzw = normalize(d1.yzw);
+    // d1.yzw = normalize(d1.yzw);
+
+    _Result4[id.x] = _NoiseToAlpha ? d1.yzwx : d1;
+}
+
+
+

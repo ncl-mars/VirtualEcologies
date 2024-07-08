@@ -1,0 +1,404 @@
+/*
+	RESUME : 
+		Transform a liste of texture into 2D Sdf and 2D Path Sdf (shape + curve)  
+		
+	TODO : 
+		REMOVE _SDF_INPUT directive
+
+		ENCODE sqrt(distance) / DECODE dot2(normal) => CHEAPER AND MORE PRECISE in low numbers
+
+*/
+
+//-- texture to sdf kernels
+#pragma kernel CSOutlines
+#pragma kernel CSDistances
+#pragma kernel CSBlurDistances
+#pragma kernel CSNormals
+
+//-- resize to target (convert multi res list)
+#pragma kernel CSFormater
+
+//-- sdf to path kernels
+#pragma kernel CSPathLine
+#pragma kernel CSPathFromLine
+#pragma kernel CSMergePath
+#pragma kernel CSBlurNetPath
+
+
+#pragma multi_compile __ _SDF_INPUT
+
+#define THREAD_GROUP_SIZE 128
+
+#define N_EPS 0.005	// epsilon for normals computation, depreciated
+
+//-------------------------- Uniforms
+float _TargetWidth, _TargetHeight;
+float _SourceWidth, _SourceHeight;
+
+float _Thresh;
+uint _PixelCount;
+uint _BlurIter; 	// MEAN of n² neighboors
+uint _ChannelMode; 	// Mode to isolate shapes from texture; TODO !
+
+float _SmoothPathUnion; // smooth min factor
+bool _CompressNorDt;
+
+//-------------------------- Buffers
+Texture2D _SourceTex;
+
+RWStructuredBuffer<float> _Result;
+AppendStructuredBuffer<float> _OutlineID_A; // Append buffers to store outline's pix ids, needs to be float to match strides
+StructuredBuffer<float> _Sign;
+StructuredBuffer<float> _OutlineID;
+
+StructuredBuffer<float> _SDF;
+RWStructuredBuffer<float2> _Normals;
+
+RWStructuredBuffer<float4> _Colors;
+
+StructuredBuffer<int> _PathID;
+StructuredBuffer<float4> _Path;
+
+
+//--------------------------- Import libs
+#define TARGET_DIM float3(_TargetWidth, _TargetHeight, 1)
+#include "../Includes/Generators.hlsl"
+
+//--------------------------- utils
+uint2 GetSourcePixel(uint2 pixel){
+
+	return PtcToPic(pixel, float2(_SourceWidth, _SourceHeight));
+}
+
+//--------------------------- Compute's methods
+// Thanks Inigo Quilez and P_Malin !
+float2 CalcNormals(uint2 pix){
+
+	float2 fres = float2(_TargetWidth, _TargetHeight);
+	float2 uv = (pix + 0.5) / fres;
+
+	const float eps = 0.0001; // or some other value
+    float2 e = float2(1.0,-1.0)*0.5773*eps;
+
+	return normalize(
+		e.xy * FetchBufferBilinear(_SDF, uv + e.xy, fres ) + 
+		e.yy * FetchBufferBilinear(_SDF, uv + e.yy, fres ) + 
+		e.yx * FetchBufferBilinear(_SDF, uv + e.yx, fres ) + 
+		e.xx * FetchBufferBilinear(_SDF, uv + e.xx, fres ) 
+	);
+}
+
+bool IsOutlinePixel(uint2 pix, bool isSdf){
+
+	// margin in
+	pix = clamp(pix, 1, uint2(_TargetWidth - 1, _TargetHeight - 1));
+
+	if(isSdf){
+		float up    = _SDF[PtcToIdt( uint2( pix.x, pix.y + 1) )];
+		float down  = _SDF[PtcToIdt( uint2( pix.x, pix.y - 1) )];
+		float right = _SDF[PtcToIdt( uint2( pix.x + 1, pix.y ))];
+		float left  = _SDF[PtcToIdt( uint2( pix.x - 1, pix.y ))];
+
+		return (up > 0 || down > 0 || left > 0 || right > 0);
+	}
+
+	else
+	{
+		float up    = _SourceTex[GetSourcePixel( uint2( pix.x, pix.y + 1 ))][_ChannelMode];
+		float down  = _SourceTex[GetSourcePixel( uint2( pix.x, pix.y - 1 ))][_ChannelMode];
+		float right = _SourceTex[GetSourcePixel( uint2( pix.x + 1, pix.y ))][_ChannelMode];
+		float left  = _SourceTex[GetSourcePixel( uint2( pix.x - 1, pix.y ))][_ChannelMode];
+
+		return (up <= _Thresh || down <= _Thresh || left <= _Thresh || right <= _Thresh);
+	}
+}
+
+bool IsPathLinePixel(uint2 pix){
+
+	float2 nup    = normalize(_Normals[PtcToIdt( uint2( pix.x, pix.y + 1) )]);
+	float2 ndown  = normalize(_Normals[PtcToIdt( uint2( pix.x, pix.y - 1) )]);
+	float2 nright = normalize(_Normals[PtcToIdt( uint2( pix.x + 1, pix.y) )]);
+	float2 nleft  = normalize(_Normals[PtcToIdt( uint2( pix.x - 1, pix.y) )]);
+
+	float du = dot(ndown, nup);
+	float dr = dot(nleft, nright);
+	return (du < 0 || dr < 0);
+}
+
+float2 GetDirFromPathLine(uint idPath){
+
+	float2 dir;
+	float2 pathPos = PtcToNtc(IdtToPtc((uint)_PathID[idPath]));
+
+	if(idPath == _PixelCount - 1){
+		dir = PtcToNtc(IdtToPtc((uint)_PathID[idPath-1])) - pathPos;
+	}
+	else if(idPath == 0){ 
+		dir = pathPos - PtcToNtc(IdtToPtc((uint)_PathID[idPath+1]));
+	}
+	else{ 
+		dir = PtcToNtc(IdtToPtc((uint)_PathID[idPath-1])) - PtcToNtc(IdtToPtc((uint)_PathID[idPath+1]));
+	}
+
+	return normalize(dir);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+ // compute the outlines from the alpha channel
+[numthreads(THREAD_GROUP_SIZE,1,1)]
+void CSOutlines (uint3 id : SV_DispatchThreadID){
+
+    uint2 pixel = IdtToPtc(id.x);
+
+	#ifdef _SDF_INPUT
+		float sgn = sign(_SDF[id.x]);
+	#else
+		float sgn = _SourceTex[GetSourcePixel(pixel)].a > _Thresh ? -1.0 : 1.0;
+	#endif
+
+	float outline = 1.0;
+
+    if(sgn < 0.0)
+	{
+		#ifdef _SDF_INPUT
+			bool isPixOutline = IsOutlinePixel(pixel, true);
+		#else
+			bool isPixOutline = IsOutlinePixel(pixel, false);
+		#endif
+
+        outline = 1.0 - (float)isPixOutline;
+		if(isPixOutline) _OutlineID_A.Append((float)id.x);
+    }
+
+	_Result[id.x] = outline * sgn; // outline pixel = 0, in shape = -1, out shape = 1
+}
+
+////////////////////////////////////////////////////////////////////////////////
+ // compute the distance to the closest outline pixel
+[numthreads(THREAD_GROUP_SIZE,1,1)]
+void CSDistances (uint3 id : SV_DispatchThreadID){
+
+	float2 pixPos = PtcToNtc(IdtToPtc(id.x));
+	float dist = 1e6;
+
+	// keep the distance of the nearest outline pixel
+	for(uint i = 0; i < _PixelCount; i++)
+	{
+		float2 outlinePixPos = PtcToNtc(IdtToPtc((uint)_OutlineID[i]));
+		float distToOutline = length(pixPos - outlinePixPos);
+		
+		distToOutline *= 0.5;
+
+		dist = min(dist, distToOutline);
+	}
+
+	int sgn = (int)_Sign[id.x];
+	sgn = (sgn == 0) ? -1 : sgn; // if is outline is in shape, so -1.0
+	_Result[id.x] = dist * sgn;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+ // blur distance "attribute" by average with it's neighboors (mean value).
+ // this is the same process as antialiasing (by supersampling)
+[numthreads(THREAD_GROUP_SIZE,1,1)]
+void CSBlurDistances (uint3 id : SV_DispatchThreadID){
+
+	uint2 pixel = IdtToPtc(id.x);
+	float sum = 0.0;
+
+	for(uint x = 0; x < _BlurIter; x++)
+    for(uint y = 0; y < _BlurIter; y++)
+    {
+        float2 off = float2(x, y) - (float2)(_BlurIter / 2.0);
+		uint2 nPixel = (uint2)(round(pixel + off));
+
+		sum += _SDF[PtcToIdt(nPixel)];
+	}
+
+	sum /= _BlurIter * _BlurIter;
+
+	_Result[id.x] = sum;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+ // Compute normals using gradient
+[numthreads(THREAD_GROUP_SIZE,1,1)]
+void CSNormals (uint3 id : SV_DispatchThreadID){
+
+	uint2 pix = clamp(IdtToPtc(id.x), (uint2)1, uint2(_TargetWidth-1, _TargetHeight-1));
+	float2 nor = CalcNormals(pix);
+	
+	if(_CompressNorDt){
+		float d = max(_SDF[id.x] * 0.5 + 0.5, 0.0001);
+		nor *= d;
+	}
+	
+	_Normals[id.x] = nor;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+[numthreads(THREAD_GROUP_SIZE,1,1)]
+void CSPathLine (uint3 id : SV_DispatchThreadID){
+
+	float d = _SDF[id.x];
+
+	if(d < 0){
+
+		uint2 pixel = clamp(IdtToPtc(id.x), 1, uint2(_TargetWidth, _TargetHeight) - 1);
+		
+		if(IsPathLinePixel(pixel)){
+
+			if(pixel.x % 2 == 0 && pixel.y % 2 == 0) // keep even pixels only is enough
+				_OutlineID_A.Append((float)id.x);
+		}
+	}
+}
+
+////////////////////////////////////////////////////////////////////////////////
+[numthreads(THREAD_GROUP_SIZE,1,1)]
+void CSPathFromLine (uint3 id : SV_DispatchThreadID){
+
+	float2 pos = PtcToNtc(IdtToPtc(id.x));
+	float2 nor = normalize(_Normals[id.x].xy);
+
+	float dist = 1e6;
+	float sgn = 0;
+	float2 dir = 0;
+
+	for(uint i = 0; i < _PixelCount; i++){
+
+		float2 pathPos = PtcToNtc(IdtToPtc((uint)_PathID[i]));
+		float distToPath = length(pos - pathPos) * 0.5;
+
+		if( distToPath < dist){
+
+			dist = distToPath;
+			dir = GetDirFromPathLine(i);
+			
+			// sgn represent side of the line
+			sgn = cross( float3(nor, 0), float3(dir, 0) ).z;
+			sgn = sign(sgn);
+		}
+	}
+
+	//------------------------------------------ encode path
+	float mag = clamp(_SDF[id.x], -0.999, 1.0) * 0.5 + 0.5;
+	float2 rg = nor * mag;
+
+	mag = dist * sgn;
+	mag = clamp(mag, -0.999, 1) * 0.5 + 0.5;
+	float2 ba = -dir * mag;
+
+	_Colors[id.x] = float4(rg, ba);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+[numthreads(THREAD_GROUP_SIZE,1,1)]
+void CSMergePath (uint3 id : SV_DispatchThreadID){
+
+	float4 newPath = _Path[id.x];
+	float4 netPath = _Colors[id.x];
+	
+	//------------------------------------------------- Distance To Shape
+	float newDist = length(newPath.rg) * 2 - 1;
+	float netDist = length(netPath.rg) * 2 - 1;
+
+	bool smoothUnion = _SmoothPathUnion > 0.00001;
+
+	if(smoothUnion){
+
+		float2 blend = SMin(newDist, netDist, _SmoothPathUnion);
+
+		float distShp = clamp(blend.x, -1, 1) * 0.5 + 0.5;
+		float2 netNor = normalize(netPath.rg);
+		float2 newNor = normalize(newPath.rg);
+
+		float2 nor = lerp(newNor, netNor, blend.y);
+		nor = normalize(nor);
+
+		//------------------------------------------------- Center
+		newDist = length(newPath.ba);
+		netDist = length(netPath.ba);
+
+		float distCtr = lerp(newDist, netDist, blend.y);
+		
+		float2 netDir = normalize(netPath.ba);
+		float2 newDir = normalize(newPath.ba);
+
+		float2 dir = lerp(newDir, netDir, blend.y);
+		dir = normalize(dir);
+
+		//------------------------------------------------- Encode
+		float2 rg = nor * distShp;
+		float2 ba = dir * distCtr;
+
+		_Colors[id.x] = float4(rg, ba);
+	}
+
+	// simple union
+	else{
+		if(newDist < netDist){
+			_Colors[id.x] = newPath;
+		}
+	}
+}
+
+////////////////////////////////////////////////////////////////////////////////
+[numthreads(THREAD_GROUP_SIZE,1,1)]
+void CSBlurNetPath (uint3 id : SV_DispatchThreadID){
+
+	uint2 pixel = IdtToPtc(id.x);
+
+	float2 sumDist = 0;
+	float4 sumVec = 0;
+
+	for(uint x = 0; x < _BlurIter; x++)
+    for(uint y = 0; y < _BlurIter; y++){
+
+        float2 off = float2(x, y) - (float2)(_BlurIter / 2.0);
+		uint2 nPixel = (uint2)(round(pixel + off));
+
+		float4 pathData = _Path[PtcToIdt(nPixel)];
+		
+		sumDist.x += length(pathData.rg);
+		sumDist.y += length(pathData.ba);
+
+		sumVec.xy += normalize(pathData.rg);
+		sumVec.zw += normalize(pathData.ba);
+	}
+
+	float iterCount = _BlurIter * _BlurIter;
+	
+	sumVec /= iterCount;
+	sumDist /= iterCount;
+
+	sumVec.rg = normalize(sumVec.xy) * sumDist.x;
+	sumVec.ba = normalize(sumVec.zw) * sumDist.y;
+
+	_Colors[id.x] = sumVec;
+}
+
+//////////////////////////////////////////////////////////////////////////////// UTILS
+ // Used only to resize texture to targetResolution
+[numthreads(THREAD_GROUP_SIZE,1,1)]
+void CSFormater (uint3 id : SV_DispatchThreadID){
+
+	uint2 pix = IdtToPtc(id.x);
+	_Colors[id.x] = _SourceTex[GetSourcePixel(pix)];
+}
+
+
+
+
+
+
+//__________________________________________________________________________________
+	// {
+	// 	float d = _SDF[id.x];
+	// 	uint2 pOff = uint2(1, 0);
+	// 	_Normals[id.x] = normalize
+	// 	(
+	// 		float2( lerp( d, _SDF[PtcToIdt(pix + pOff.xy)], N_EPS) - lerp(d, _SDF[PtcToIdt(pix - pOff.xy)], N_EPS),
+	// 				lerp( d, _SDF[PtcToIdt(pix + pOff.yx)], N_EPS) - lerp(d, _SDF[PtcToIdt(pix - pOff.yx)], N_EPS))
+	// 	);
+	// }

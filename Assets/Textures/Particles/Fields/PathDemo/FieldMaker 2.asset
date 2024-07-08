@@ -1,0 +1,38 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e9bc40ff0903ad541b45b52f1de4cb33, type: 3}
+  m_Name: FieldMaker 2
+  m_EditorClassIdentifier: 
+  inputs:
+    colorSources:
+    - texture: {fileID: 2800000, guid: e1ea257c410d0fc44b157081329322e2, type: 3}
+      readRotation: 0
+    - texture: {fileID: 2800000, guid: e06e93ee2db53fb4198b1108f0d79cf3, type: 3}
+      readRotation: 2
+    - texture: {fileID: 2800000, guid: 68c19afef18e323429edd7bf80e15b7b, type: 3}
+      readRotation: 1
+    heightSources:
+    - texture: {fileID: 2800000, guid: 391c71e9d58b5a044a2673602c16fb7b, type: 3}
+      isClamped: 1
+  generation:
+    mapType: 2
+    targetResolution: {x: 512, y: 512}
+    channelMode: 3
+    thresh: 0
+    blurDistances: 15
+    keepFieldExact: 1
+    smoothPathUnion: 0.005
+    blurPaths: 19
+  export:
+    halfFloat: 0
+    outFilterSetup: 0
+    linkId: 2

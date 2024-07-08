@@ -1,0 +1,70 @@
+:root {
+    /*------------------------------- unity palette */
+    --grey-clear: rgb(70, 70, 70); 
+    --grey: rgb(56, 56, 56); 
+    --grey-smoke: rgb(41, 41, 41); 
+    --grey-dark: rgb(40, 40, 40);
+    --white-smoke: rgb(196, 196, 196);
+    --blue: rgb(128, 178, 251);
+    /* --link: rgb(26, 27, 32); */
+    --link: var(--grey-dark);
+}
+
+/*--------------------- Field Maker */
+.custom-inspector{
+    margin-bottom: 4px;
+}
+
+.custom-inspector > .unity-foldout > .unity-foldout__toggle{    
+    background-color: var(--grey-clear);
+    padding-top: 2px;
+    padding-bottom: 2px;
+}
+
+.linked > .unity-foldout > .unity-foldout__toggle{    
+    background-color: var(--link);
+}
+
+.custom-inspector .unity-button{
+    margin-top: 7px;
+    padding: 2px;
+    align-self: center;
+    width: 50%;
+    max-width: 200px;
+
+    background-color: var(--grey-smoke);
+    border-color: var(--white-smoke);
+}
+
+.custom-inspector .unity-button:hover{
+    border-color: var(--blue);
+    color: var(--blue);
+}
+
+/*--------------------- Field Particles */
+.custom-inspector .unity-slider > .unity-float-field{
+    width: 50px;
+} 
+
+.plane-field-particles .unity-slider > .unity-float-field{
+    width: 50px;
+} 
+
+.plane-field-particles > .unity-foldout__toggle{    
+    background-color: var(--grey-clear);
+    padding-top: 1px;
+    padding-bottom: 1px;
+}
+
+/* .plane-field-particles>.unity-foldout__toggle{
+    -unity-font-style: bold; 
+}
+
+.plane-field-particles>.unity-group-box__label{
+    -unity-font-style: bold; 
+} */
+
+
+/* id are field Name*/ 
+/* #halfFloat{} */
+
