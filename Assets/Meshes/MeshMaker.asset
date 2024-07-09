@@ -14,3 +14,5 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   numVertX: 64
   numVertY: 64
+  setUvs: 0
+  setNormals: 0

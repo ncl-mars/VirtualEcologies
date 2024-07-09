@@ -23,30 +23,6 @@ namespace Custom.Particles.PlaneField.Visualizer
         internal static readonly int textures  = Shader.PropertyToID("_FieldTex");
     }
 
-    [Serializable] public struct FieldHelperData
-    {
-        [HideInInspector] public Matrix4x4 localToWorld;
-        [HideInInspector] public Matrix4x4 worldToLocal;
-        [HideInInspector] public Vector2 scales;
-        [HideInInspector] public int texId;
-        public State state;
-        
-        public static int Size{get=>Marshal.SizeOf<FieldHelperData>();}
-
-        public ParticlesForceField Field
-        {
-            set
-            {
-                localToWorld = value.transform.localToWorldMatrix;
-                worldToLocal = value.transform.worldToLocalMatrix;
-
-                scales.x = value.transform.lossyScale.y;
-                scales.y = value.transform.lossyScale.z;
-                texId = value.FieldTextureID;
-            }
-        }
-    }
-
     public enum State : int
     {
         Hide = 0,
@@ -65,8 +41,7 @@ namespace Custom.Particles.PlaneField.Visualizer
 
         public bool destroyOnStart = false;
 
-        private Vector4 grid = new(64,64); // vertex grid
-        private int indexCount; // tris vertices
+        private Vector4 grid = new(64,64); // frag grid
 
         [SerializeField] private Vector4[] uvb;
         private Matrix4x4[] umb = new Matrix4x4[2];
@@ -107,7 +82,7 @@ namespace Custom.Particles.PlaneField.Visualizer
 
         private void Update()
         {
-            Graphics.RenderPrimitives(renderParams, MeshTopology.Triangles, indexCount, sceneObjects.fields.Length);
+            Graphics.RenderMeshPrimitives(renderParams, mesh, 0, sceneObjects.fields.Length);
         }
 
         private void OnValidate()
@@ -123,15 +98,13 @@ namespace Custom.Particles.PlaneField.Visualizer
 
         public void Init(PlaneFieldSystem system)
         {
-            if(material == null)
+            if((material == null) || (mesh == null))
             {
                 enabled = false;
                 return;
             }
 
             this.system = system;
-            indexCount = (int)((grid.x-1)*(grid.y-1) * 6); // 6 indices, 2 tris per quad
-
             
             RecreateRenderer();
 #if UNITY_EDITOR

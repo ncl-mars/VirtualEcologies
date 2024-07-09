@@ -44,6 +44,9 @@ Pass
 
     #include "UnityCG.cginc"
 
+    struct appdata{
+        float4 vertex : POSITION;
+    };
     
     struct v2f {
 
@@ -51,8 +54,9 @@ Pass
         float2 uv : TEXCOORD0;
         float3 view : TEXCOORD1;
         float3 nor : NORMAL;
-        uint inst : SV_InstanceID;
         float4 col : COLOR0; // used for field data
+
+        uint inst : SV_InstanceID;
     };
 
     #define FIELDS_INDEX 3
@@ -84,50 +88,6 @@ Pass
     #include "../Includes/ColorFunctions.hlsl"
     #include "../Includes/SDFOperations.hlsl"
 
-    
- 
-    // static int trisOffset [6] = {
-    //     0,
-    //     _Grid.x,
-    //     1,
-    //     1,
-    //     _Grid.x,
-    //     _Grid.x + 1,
-    // };
-    
-    static int trisOffset [6] = {
-        0,
-        _Grid.x,
-        1,
-        1,
-        _Grid.x,
-        _Grid.x + 1,
-    };
-    
-    // static int trisOffset [6] = {
-    //     _Grid.x,
-    //     _Grid.x + 1,
-    //     0,
-    //     0,
-    //     _Grid.x + 1,
-    //     1
-    // };
-    
-
-    #define TrisIdsToQuadIds(vertexID) (floor(vertexID/6) + trisOffset[vertexID%6])
-
-    bool GetTrisPlanarCoords(uint id, uint2 grid, out float3 pos){
-
-        uint posId = TrisIdsToQuadIds(id);
-        uint2 pixel = IdtToPtc(posId, grid);
-
-        if(_Modes[0] != 2){
-            if(pixel.x<1) return false;
-        }
-        
-        pos = float3(PtcToNtc(pixel, grid), 0);
-        return true;
-    }
 
     void PlateformVert(inout v2f o) {
 
@@ -211,22 +171,20 @@ Pass
         o.pos.z = height;
     }
 
-    v2f vert(uint vertexID: SV_VertexID, uint instanceID : SV_InstanceID)
-    {
+    v2f vert(appdata v, uint instanceID : SV_InstanceID){
+        
         uint2 grid = (uint2)_Grid;
 
         v2f o; 
         o.inst = instanceID; 
         o.col = 0; o.nor = 0;
 
-        float3 pos;
-        if(!GetTrisPlanarCoords(vertexID, grid, pos))return o;
+        float3 pos = v.vertex.xyz * 2.0;
 
-        o.pos = float4(pos,0);
+        o.pos = float4(pos,0) * 0.999;
         o.uv = o.pos * 0.5 + 0.5;
         o.view = 0;
 
-        // o.pos *=2;
         
         if      (_Modes[0] == 0) AltiVert(o);
         else if (_Modes[0] == 1) GravityVert(o);
@@ -243,9 +201,7 @@ Pass
 
     float4 frag(v2f i) : SV_Target {
 
-
-        // return 1;
-        // // if(_FieldHelpers[i.inst].state == 0) return 0;
+        // if(_FieldHelpers[i.inst].state == 0) return 0;
         
         float3 rd = normalize(i.view);
         float3 ref = reflect(rd, i.nor);
@@ -278,16 +234,16 @@ Pass
         col.a = i.col.a;
 
         // if(_Wireframe)
-        // {
-        //     float2 uv = i.uv * _Grid.xy * 0.5;
-        //     float thick = 0.1;
+        {
+            float2 uv = i.uv * _Grid.xy * 0.5;
+            float thick = 0.1;
 
-        //     float2 guv = saturate( abs(frac(uv)-0.5)*2.0 - thick); // sawtooth [0,1] to tri [-1,1] => clip thick            
-        //     guv = 1.0 - saturate( guv/fwidth(uv*2) + 0.5);
+            float2 guv = saturate( abs(frac(uv)-0.5)*2.0 - thick); // sawtooth [0,1] to tri [-1,1] => clip thick            
+            guv = 1.0 - saturate( guv/fwidth(uv*2) + 0.5);
 
-        //     col.rgba *= pow(max(guv.x, guv.y)*2.0, 0.5);
-        //     col.rgb *= 0.75;
-        // }
+            col.rgba *= pow(max(guv.x, guv.y)*2.0, 0.5);
+            col.rgb *= 0.75;
+        }
 
         clip(col.a - 0.1); // discard on alpha
 

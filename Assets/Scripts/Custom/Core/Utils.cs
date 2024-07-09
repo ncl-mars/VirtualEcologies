@@ -464,7 +464,7 @@ namespace Custom
         }
 
         //https://discussions.unity.com/t/how-to-generate-a-subdivided-plane-mesh/247495
-        public static Mesh CreateSubdivideQuad ( int numVertX = 16 , int numVertY = 16 )
+        public static Mesh CreateSubdivideQuad ( int numVertX = 16 , int numVertY = 16, bool setUv = true, bool setNormals = true )
         {
             int vertCount = numVertX * numVertY;
 
@@ -502,8 +502,8 @@ namespace Custom
             mesh.name = $"SubDivQuad {mesh.GetHashCode()}";
             mesh.vertices = vertices;
             mesh.triangles = indices.ToArray();
-            mesh.uv = uvs;
-            mesh.normals = normals;
+            if(setUv)mesh.uv = uvs;
+            if(setNormals)mesh.normals = normals;
 
             return mesh;
         }

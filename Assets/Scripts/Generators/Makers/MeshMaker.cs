@@ -20,10 +20,12 @@ namespace Custom.Generators.Makers
         public int numVertX = 16;
         public int numVertY = 16;
 
+        public bool setUvs = true;
+        public bool setNormals = true;
+
         public void Generate()
         {
-            Mesh mesh = MeshUtils.CreateSubdivideQuad(numVertX, numVertY);
-
+            Mesh mesh = MeshUtils.CreateSubdivideQuad(numVertX, numVertY, setUvs, setNormals);
             MeshUtils.SaveMeshAsset(mesh, GetPathFromObject(this, "_SubPlane_" + numVertX.ToString() + "X" + numVertY.ToString()));
         }
     }
