@@ -58,6 +58,7 @@ namespace Custom.Particles
             renderer.Draw(simulation.MaxCount);
         }
 
+#if UNITY_EDITOR
         //---------------------------------------------------------------------------------------
         [ContextMenu("Recreate serialized vectors")]
         private void RecreateSerialized()
@@ -77,5 +78,6 @@ namespace Custom.Particles
             for(int val = 0; val <= 64; val++ ) sb += "\n"+ string.Format("{0,3} - {1:G}", val, (RendererModes)val);
             Debug.Log(sb);
         }
+#endif
     }
 }

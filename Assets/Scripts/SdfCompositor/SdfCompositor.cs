@@ -3,8 +3,9 @@
     private Texture2D shapesBuffer; // Todo if limited buffer amount (depends on graphic apis)
     #endif
 */
-
+#if UNITY_EDITOR
 // #define TEXTURE_BUFFER
+
 using System;
 using System.Collections.Generic;
 
@@ -248,3 +249,4 @@ namespace Custom.Compositor
 
     }
 }
+#endif

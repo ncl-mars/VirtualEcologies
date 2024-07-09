@@ -1,3 +1,6 @@
+/*
+*/
+#if UNITY_EDITOR
 using System;
 using UnityEngine;
 
@@ -29,3 +32,4 @@ namespace Custom.Particles
         }
     }
 }
+#endif

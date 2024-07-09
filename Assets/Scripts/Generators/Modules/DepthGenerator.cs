@@ -1,11 +1,11 @@
 /*
 */
+#if UNITY_EDITOR
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEditor;
 using System;
-
 
 namespace Custom.Generators.Modules
 {
@@ -210,7 +210,7 @@ namespace Custom.Generators.Modules
         {
             if(tex == null){
                 string msg = "you must provide a " + name + "texture (made by the path maker)\nABORT";
-                EditorUtility.DisplayDialog ("No Texture found", msg, "Ok");
+                Debug.LogWarning("No Texture found\n" + msg);
                 return false;
             }
             else return true;
@@ -232,7 +232,7 @@ namespace Custom.Generators.Modules
         }
     }
 }
-
+#endif
 
 
 

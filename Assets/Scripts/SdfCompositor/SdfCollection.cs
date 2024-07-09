@@ -8,6 +8,7 @@
     https://learn.microsoft.com/fr-fr/dotnet/standard/design-guidelines/choosing-between-class-and-struct
 
 */
+#if UNITY_EDITOR
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEditor;
@@ -424,3 +425,4 @@ namespace Custom.Compositor
         }
     }
 }
+#endif

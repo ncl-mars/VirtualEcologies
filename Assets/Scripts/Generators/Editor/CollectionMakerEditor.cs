@@ -12,7 +12,7 @@ namespace Custom.Generators.GUI
 {
     // Inspector GUI
     [CustomEditor(typeof(CollectionMaker))][CanEditMultipleObjects]
-    public class CollectionMakerEditor : TextureMakerEditor
+    public class CollectionMakerEditor : MakerEditor
     {
         private VisualElement inspector;
         private VisualElement enumLink;

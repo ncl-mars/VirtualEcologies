@@ -36,7 +36,7 @@
  31 - Perlin, Fractal, Gradient_Fractal, FBM, FBM_Derivatives
 
 */
-
+#if UNITY_EDITOR
 using UnityEngine;
 using UnityEditor;
 using Custom;
@@ -170,7 +170,7 @@ namespace Custom.Generators.Modules
             }
             if(targetResolution.x == 0 || targetResolution.y == 0 || targetResolution.z == 0){
                 string msg = "targetResolution to zero detected\nyou must set a proper output targetResolution\nABORT";
-                EditorUtility.DisplayDialog ("Wrong output targetResolution", msg, "Ok");
+                Debug.LogWarning("Wrong output targetResolution " + msg );
                 return false;
             }
 
@@ -195,7 +195,7 @@ namespace Custom.Generators.Modules
         }
     }
 }
-
+#endif
 
 
 

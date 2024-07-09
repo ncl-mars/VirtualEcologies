@@ -11,7 +11,7 @@ namespace Custom.Generators.GUI
 {
     // Inspector GUI
     [CustomEditor(typeof(NoiseMaker))][CanEditMultipleObjects]
-    public class NoiseMakerEditor : TextureMakerEditor
+    public class NoiseMakerEditor : MakerEditor
     {
         VisualElement inspector;
         protected NoiseTypes NoiseTypeToShow { get=>(NoiseTypes)63; }

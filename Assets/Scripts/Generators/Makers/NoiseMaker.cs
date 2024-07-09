@@ -1,12 +1,11 @@
 /*
 */
-
+#if UNITY_EDITOR
 using System;
 using System.Collections.Generic;
 
 using UnityEngine;
 using UnityEditor;
-
 
 namespace Custom.Generators.Makers
 {
@@ -14,7 +13,7 @@ namespace Custom.Generators.Makers
 
     //////////////////////////////////////////////////////////////////////////
     [CreateAssetMenu(fileName = "NoiseMaker", menuName = "ScriptableObjects/Generators/NoiseMaker", order = 1)]
-    public class NoiseMaker : TextureMaker, IGenerator
+    public class NoiseMaker : Maker, IGenerator
     {
         [Serializable] public class GenerationParams
         {
@@ -131,7 +130,7 @@ namespace Custom.Generators.Makers
         }
     }
 }
-
+#endif
 
 
 

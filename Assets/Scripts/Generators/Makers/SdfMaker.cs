@@ -1,3 +1,4 @@
+#if UNITY_EDITOR
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -11,7 +12,7 @@ using Custom.Generators.Modules;
 namespace Custom.Generators.Makers
 {
     [CreateAssetMenu(fileName = "SdfMaker", menuName = "ScriptableObjects/Generators/SdfMaker", order = 2)]
-    public class SdfMaker : TextureMaker, IGenerator
+    public class SdfMaker : Maker, IGenerator
     {
         [Serializable]public class GenerationParams
         {
@@ -136,7 +137,7 @@ namespace Custom.Generators.Makers
         }
     }
 }
-
+#endif
 
 
 

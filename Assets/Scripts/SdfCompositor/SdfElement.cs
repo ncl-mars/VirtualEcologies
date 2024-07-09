@@ -9,7 +9,7 @@
     TODO : inheritage from sd element with virtual methods 
     => for specifics shaders + buffers
 */
-
+#if UNITY_EDITOR
 // #define SHOW_IDS // DEBUG
 
 using System.Collections.Generic;
@@ -17,7 +17,6 @@ using System.Runtime.InteropServices;
 
 using UnityEngine;
 using System;
-
 
 namespace Custom.Compositor
 {
@@ -256,6 +255,6 @@ namespace Custom.Compositor
         public virtual void WriteOnBuffer(ref Texture2D buffer, int id){ Debug.Log("TODO: Write on Texture buffer in elements"); }
     }
 }
-
+#endif
 
 //____________________________________________________________________________________________________________

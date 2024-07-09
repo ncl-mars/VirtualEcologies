@@ -156,6 +156,8 @@ namespace Custom
     // there is surely a way to factorize all this... at least at texture creation
     public static class TexUtils
     {
+
+#if UNITY_EDITOR
         public static void SaveTextureAsset(Texture tex, string pathWithoutExt)
         {
             string path = pathWithoutExt + ".asset";
@@ -180,6 +182,7 @@ namespace Custom
                 AssetDatabase.Refresh();
             }
         }
+#endif
 
         public static Texture2D CreateTex2D(float[] values, int width, int height, bool half = false,
         FilterMode filter = FilterMode.Point, TextureWrapMode wrap = TextureWrapMode.Clamp)
@@ -503,6 +506,25 @@ namespace Custom
             mesh.normals = normals;
 
             return mesh;
+        }
+
+        public static void SaveMeshAsset(Mesh mesh, string pathWithoutExt)
+        {
+            string path = pathWithoutExt + ".asset";
+
+            Mesh existing = AssetDatabase.LoadAssetAtPath<Mesh>(path);
+            if(existing != null)
+            {
+                Debug.LogFormat("Overwrite mesh asset at path : {0}", path);
+                mesh.name = Path.GetFileNameWithoutExtension(path);
+                EditorUtility.CopySerialized(mesh, existing);
+            }
+            else
+            {
+                Debug.Log("Create mesh asset at path : " + path);
+                AssetDatabase.CreateAsset(mesh,  path);
+                AssetDatabase.Refresh();
+            }
         }
     }
 

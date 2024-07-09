@@ -8,7 +8,7 @@ using Custom.GUIEditor;
 
 namespace Custom.Generators.GUI
 {
-    public abstract class TextureMakerEditor : GUIInspector
+    public abstract class MakerEditor : GUIInspector
     {
         protected virtual void FillInspectorContent(VisualElement inspector,  bool generateButton)
         {

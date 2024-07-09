@@ -16,7 +16,8 @@ namespace Custom.Generators.Makers
         Atlas               = 3,
     };
 
-    public abstract class TextureMaker : ScriptableObject
+#if UNITY_EDITOR
+    public abstract class Maker : ScriptableObject
     {
         protected string GetPathFromObject(UnityEngine.Object tex, string suffix)
         {
@@ -31,4 +32,6 @@ namespace Custom.Generators.Makers
             return path;
         }
     }
+#endif
+
 }

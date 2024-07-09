@@ -4,7 +4,7 @@ using System.Linq;
 using UnityEditor;
 using UnityEngine;
 
-
+#if UNITY_EDITOR
 namespace Custom.Particles
 {
     [CreateAssetMenu(fileName = "ParticlesData", menuName = "ScriptableObjects/Particles/System Data", order = 1)]
@@ -114,3 +114,4 @@ namespace Custom.Particles
         }
     }
 }
+#endif

@@ -13,16 +13,38 @@ namespace Custom.Particles.PlaneField.Visualizer
 {
     internal static class MateProps
     {
+        internal static readonly string[] k_numFields       = {"_1xF", "_2xF", "_3xF", "_4xF"}; // NUM_FIELDS
+
         internal static readonly string keyTexArray = "_FIELD_TEXARRAY";
 
-        internal static readonly int fieldBuffer   = Shader.PropertyToID("_FieldHelpers");
-        internal static readonly int fieldTexture  = Shader.PropertyToID("_FieldTex");
+        internal static readonly int uvb   = Shader.PropertyToID("_UVB");
+        internal static readonly int umb  = Shader.PropertyToID("_UMB");
 
-        internal static readonly int fieldTexSize   = Shader.PropertyToID("_FieldTexSize");
-        internal static readonly int simulationMode = Shader.PropertyToID("_SimulationMode");
-        internal static readonly int numFields      = Shader.PropertyToID("_NumFields");
-        internal static readonly int grid           = Shader.PropertyToID("_Grid");
-        internal static readonly int wireframe      = Shader.PropertyToID("_Wireframe");
+        internal static readonly int textures  = Shader.PropertyToID("_FieldTex");
+    }
+
+    [Serializable] public struct FieldHelperData
+    {
+        [HideInInspector] public Matrix4x4 localToWorld;
+        [HideInInspector] public Matrix4x4 worldToLocal;
+        [HideInInspector] public Vector2 scales;
+        [HideInInspector] public int texId;
+        public State state;
+        
+        public static int Size{get=>Marshal.SizeOf<FieldHelperData>();}
+
+        public ParticlesForceField Field
+        {
+            set
+            {
+                localToWorld = value.transform.localToWorldMatrix;
+                worldToLocal = value.transform.worldToLocalMatrix;
+
+                scales.x = value.transform.lossyScale.y;
+                scales.y = value.transform.lossyScale.z;
+                texId = value.FieldTextureID;
+            }
+        }
     }
 
     public enum State : int
@@ -34,30 +56,6 @@ namespace Custom.Particles.PlaneField.Visualizer
     [ExecuteInEditMode]
     public class PlaneFieldSystemVisualizer : MonoBehaviour
     {
-        [Serializable] public struct FieldHelperData
-        {
-            [HideInInspector] public Matrix4x4 localToWorld;
-            [HideInInspector] public Matrix4x4 worldToLocal;
-            [HideInInspector] public Vector2 scales;
-            [HideInInspector] public int texId;
-            public State state;
-            
-            public static int Size{get=>Marshal.SizeOf<FieldHelperData>();}
-
-            public ParticlesForceField Field
-            {
-                set
-                {
-                    localToWorld = value.transform.localToWorldMatrix;
-                    worldToLocal = value.transform.worldToLocalMatrix;
-
-                    scales.x = value.transform.lossyScale.y;
-                    scales.y = value.transform.lossyScale.z;
-                    texId = value.FieldTextureID;
-                }
-            }
-        }
-
         //---------------------------------------------------------------------
         private PlaneFieldSystem system;
         [SerializeField] private ParticlesSceneObjects sceneObjects;
@@ -65,14 +63,17 @@ namespace Custom.Particles.PlaneField.Visualizer
         public Material material;
         private RenderParams renderParams;
 
-        public bool wireframe = true;
-        public bool destroyOnStart = true;
-
-        [SerializeField] private FieldHelperData[] fieldsData;
-        private GraphicsBuffer fieldBuffer;
+        public bool destroyOnStart = false;
 
         private Vector4 grid = new(64,64); // vertex grid
         private int indexCount; // tris vertices
+
+        [SerializeField] private Vector4[] uvb;
+        private Matrix4x4[] umb = new Matrix4x4[2];
+
+        [SerializeField] private Mesh mesh;
+
+        const int fieldsIndex = 3;
 
         //---------------------------------------------------------------------
         private void OnEnable()
@@ -106,20 +107,20 @@ namespace Custom.Particles.PlaneField.Visualizer
 
         private void Update()
         {
-            Graphics.RenderPrimitives(renderParams, MeshTopology.Triangles, indexCount, fieldsData.Length);
+            Graphics.RenderPrimitives(renderParams, MeshTopology.Triangles, indexCount, sceneObjects.fields.Length);
         }
 
         private void OnValidate()
         {
-            if(fieldBuffer != null)
-            {
-                renderParams.matProps.SetInt(MateProps.wireframe, wireframe ? 1 : 0);
-                fieldBuffer.SetData(fieldsData);
-                renderParams.matProps.SetBuffer(MateProps.fieldBuffer, fieldBuffer);
-            }
+
         }
 
         //---------------------------------------------------------------------
+        public PlaneFieldSystemVisualizer()
+        {
+            uvb ??= new Vector4[fieldsIndex]; // create without field
+        }
+
         public void Init(PlaneFieldSystem system)
         {
             if(material == null)
@@ -130,93 +131,100 @@ namespace Custom.Particles.PlaneField.Visualizer
 
             this.system = system;
             indexCount = (int)((grid.x-1)*(grid.y-1) * 6); // 6 indices, 2 tris per quad
+
             
             RecreateRenderer();
-            
+#if UNITY_EDITOR
             EditorApplication.hierarchyChanged += RecreateRenderer;
+#endif
         }
 
         public void Dispose()
         {
             UnregisterSceneObjects();
-
+#if UNITY_EDITOR
             EditorApplication.hierarchyChanged -= RecreateRenderer;
-
-            fieldBuffer?.Dispose();
-            fieldBuffer = null;
+#endif
         }
 
         //---------------------------------------------------------------------
         private void OnFieldChanged(ParticlesForceField field, int index)
         {
-            fieldsData[index].Field = field;
-            fieldBuffer.SetData(fieldsData, index, index, 1);
-            renderParams.matProps.SetBuffer(MateProps.fieldBuffer, fieldBuffer);
+            SetFromField(field, index);
+            renderParams.matProps.SetMatrixArray(MateProps.umb, umb);
+            renderParams.matProps.SetVectorArray(MateProps.uvb, uvb);
         }
 
         private void RecreateRenderer()
         {
             UnregisterSceneObjects();
-            InitFieldsData();
-            InitBuffers();
-            InitRenderParams();
+            
+            sceneObjects = system.GetParticlesSceneObjects();
+
+            ParticlesForceField[] fields = sceneObjects.fields;
+            PlaneFieldSimulation simulation =  system.Simulation as PlaneFieldSimulation;
+
+            uvb[0][0] = fields.Length;                      // x : numFields
+            uvb[0][1] = simulation.FieldTexture.width;      // z : field width
+            uvb[0][2] = simulation.FieldTexture.height;     // w : field height
+
+            uvb[1] = grid;
+            uvb[2][0] = simulation.Mode.GetIndex();     // w : field height
+
+            InitFieldsData(fields);
+            InitRenderParams(simulation);
             RegisterToSceneObjects();
         }
 
-        private void InitBuffers()
-        {
-            fieldBuffer?.Release();
-            fieldBuffer = new(GraphicsBuffer.Target.Structured, fieldsData.Length, FieldHelperData.Size);
-            fieldBuffer.SetData(fieldsData);
-        }
-
-        private void InitRenderParams()
+        private void InitRenderParams(PlaneFieldSimulation simulation)
         {
             Material i_material = Instantiate(material);
-            Texture fieldTex =  (system.Simulation as PlaneFieldSimulation).FieldTexture;
+            Texture fieldTex = simulation.FieldTexture;
             
             renderParams = new(i_material)
             {
-                worldBounds = new Bounds(system.Simulation.Origin, system.Simulation.Extents * 2),
+                worldBounds = new Bounds(simulation.Origin, simulation.Extents * 2),
                 matProps = new MaterialPropertyBlock(),
             };
-
-            SimulationMode mode = (system.Simulation as PlaneFieldSimulation).Mode;
-
-            renderParams.matProps.SetInt(MateProps.simulationMode, mode.GetIndex());
-            renderParams.matProps.SetVector(MateProps.grid, grid);
-            
-            renderParams.matProps.SetInt(MateProps.numFields, fieldsData.Length);
-            renderParams.matProps.SetInt(MateProps.wireframe, wireframe ? 1 : 0);
             
             if(fieldTex.dimension == TextureDimension.Tex2DArray)
             {
                 i_material.EnableKeyword(CSProps.k_fieldTexArray);
-                renderParams.matProps.SetVector(MateProps.fieldTexSize, 
-                    new Vector4(fieldTex.width, fieldTex.height, (fieldTex as Texture2DArray).depth));
             }
-            else renderParams.matProps.SetVector(MateProps.fieldTexSize, new Vector4(fieldTex.width, fieldTex.height));
 
-            renderParams.matProps.SetTexture(MateProps.fieldTexture,fieldTex);
-            renderParams.matProps.SetBuffer(MateProps.fieldBuffer, fieldBuffer);
+            int numFields = Mathf.Clamp(umb.Length / 2, 1, 4); // WARNING !, numField cached?
+            i_material.EnableKeyword(CSProps.k_numFields[numFields - 1]);
+
+            renderParams.matProps.SetVectorArray(MateProps.uvb, uvb);
+            renderParams.matProps.SetMatrixArray(MateProps.umb, umb);
+
+            renderParams.matProps.SetTexture(MateProps.textures,fieldTex);
         }
 
-        private void InitFieldsData()
+        private void InitFieldsData(ParticlesForceField[] fields)
         {
-            sceneObjects = system.GetParticlesSceneObjects();
-            int newFieldsLength = sceneObjects.fields.Length;
-
-            if(fieldsData == null || fieldsData.Length != newFieldsLength) 
+            int arrLength = fieldsIndex + fields.Length;
+            
+            if(uvb.Length != arrLength)
             {
-                fieldsData = new FieldHelperData[newFieldsLength];
-
-                for(int i = 0; i < newFieldsLength; i++)
-                {
-                    fieldsData[i].Field = sceneObjects.fields[i];
-                    fieldsData[i].state = State.Show;
-                }
+                Vector4[] vectors = new Vector4[arrLength];
+                Array.Copy(uvb, 0, vectors, 0, Mathf.Min(arrLength, uvb.Length));
+                uvb = vectors;
             }
-            else for(int i = 0; i < newFieldsLength; i++) fieldsData[i].Field = sceneObjects.fields[i];
+
+            umb = new Matrix4x4[fields.Length * 2];
+            
+            for(int i = 0; i < fields.Length; i++) SetFromField(fields[i], i);
+        }
+
+        public void SetFromField(ParticlesForceField field, int bufferIndex)
+        {
+            uvb[fieldsIndex + bufferIndex][0] = field.transform.lossyScale.y;
+            uvb[fieldsIndex + bufferIndex][1] = field.transform.lossyScale.z;
+            uvb[fieldsIndex + bufferIndex][2] = field.FieldTextureID;
+
+            umb[bufferIndex * 2]       = field.transform.worldToLocalMatrix; // (data need invert transpose matrices for scales)
+            umb[bufferIndex * 2 + 1]   = field.transform.localToWorldMatrix;
         }
 
         private void RegisterToSceneObjects()
@@ -242,3 +250,56 @@ namespace Custom.Particles.PlaneField.Visualizer
         }
     }
 }
+
+
+
+
+
+
+
+
+
+
+
+
+        // internal static readonly int fieldBuffer    = Shader.PropertyToID("_FieldHelpers");
+        // internal static readonly int fieldTexSize   = Shader.PropertyToID("_FieldTexSize");
+        // internal static readonly int simulationMode = Shader.PropertyToID("_SimulationMode");
+        // internal static readonly int numFields      = Shader.PropertyToID("_NumFields");
+        // internal static readonly int grid           = Shader.PropertyToID("_Grid");
+        // internal static readonly int wireframe      = Shader.PropertyToID("_Wireframe");
+
+
+
+
+            // fieldsData[index].Field = field;
+            // fieldBuffer.SetData(fieldsData, index, index, 1);
+            // renderParams.matProps.SetBuffer(MateProps.fieldBuffer, fieldBuffer);
+
+            // if(fieldBuffer != null)
+            // {
+            //     renderParams.matProps.SetInt(MateProps.wireframe, wireframe ? 1 : 0);
+            //     fieldBuffer.SetData(fieldsData);
+            //     renderParams.matProps.SetBuffer(MateProps.fieldBuffer, fieldBuffer);
+            // }
+
+            // fieldBuffer?.Dispose();
+            // fieldBuffer = null;
+                // renderParams.matProps.SetVector(MateProps.fieldTexSize, 
+                //     new Vector4(fieldTex.width, fieldTex.height, (fieldTex as Texture2DArray).depth));
+
+            // renderParams.matProps.SetInt(MateProps.simulationMode, simulation.Mode.GetIndex());
+            // renderParams.matProps.SetVector(MateProps.grid, grid);
+            // renderParams.matProps.SetInt(MateProps.numFields, fieldsData.Length);
+            // renderParams.matProps.SetInt(MateProps.wireframe, wireframe ? 1 : 0);
+
+            // else renderParams.matProps.SetVector(MateProps.fieldTexSize, new Vector4(fieldTex.width, fieldTex.height));
+
+
+            // renderParams.matProps.SetBuffer(MateProps.fieldBuffer, fieldBuffer);
+        // private void InitBuffers()
+        // {
+        //     fieldBuffer?.Release();
+        //     fieldBuffer = new(GraphicsBuffer.Target.Structured, fieldsData.Length, FieldHelperData.Size);
+        //     fieldBuffer.SetData(fieldsData);
+        // }

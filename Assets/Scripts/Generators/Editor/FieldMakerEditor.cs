@@ -9,7 +9,7 @@ using Custom.Generators.Makers;
 namespace Custom.Generators.GUI
 {
     [CustomEditor(typeof(FieldMaker))][CanEditMultipleObjects]
-    public class FieldMakerEditor : TextureMakerEditor
+    public class FieldMakerEditor : MakerEditor
     {
         VisualElement inspector;
         protected MapType MapTypeToShow { get=>(MapType)22; }

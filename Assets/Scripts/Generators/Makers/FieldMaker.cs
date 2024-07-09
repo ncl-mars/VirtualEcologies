@@ -2,7 +2,7 @@
     + ModalUI field attribute store a MapType Enum
     Set the attribute for the field to be shown is module flag
 */
-
+#if UNITY_EDITOR
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -17,7 +17,7 @@ namespace Custom.Generators.Makers
 {
     //////////////////////////////////////////////////////////////////////////
     [CreateAssetMenu(fileName = "FieldMaker", menuName = "ScriptableObjects/Generators/FieldMaker", order = 1)]
-    public class FieldMaker : TextureMaker, IGenerator
+    public class FieldMaker : Maker, IGenerator
     {
         //----------------------------------------------------------------------- Types
         [Serializable] public class ColorSource 
@@ -349,3 +349,4 @@ namespace Custom.Generators.Makers
 
     }
 }
+#endif

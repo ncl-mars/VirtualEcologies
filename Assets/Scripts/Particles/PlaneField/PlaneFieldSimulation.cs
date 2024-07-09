@@ -152,7 +152,7 @@ namespace Custom.Particles.PlaneField
 
         public override ComputeBuffer ParticlesBuffer{get => particles.Buffer;}
 
-        static readonly int fieldsIndex = 8; // in uvb, end of "params uniforms"
+        const int fieldsIndex = 8; // in uvb, end of "params uniforms"
 
         private ParticlesSceneObjects scene;
         private bool hasMatrixUpdate = false;

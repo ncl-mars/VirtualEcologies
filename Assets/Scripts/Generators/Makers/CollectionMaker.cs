@@ -2,6 +2,7 @@
     https://docs.unity3d.com/ScriptReference/Texture2D.PackTextures.html
 
 */
+#if UNITY_EDITOR
 
 using System.Collections.Generic;
 using UnityEngine;
@@ -9,7 +10,6 @@ using UnityEngine;
 using System;
 
 using Custom.Generators.Modules;
-
 namespace Custom.Generators.Makers
 {
     public enum LinkMode : byte
@@ -20,7 +20,7 @@ namespace Custom.Generators.Makers
 
     [ExecuteInEditMode]
     [CreateAssetMenu(fileName = "CollectionMaker", menuName = "ScriptableObjects/Generators/CollectionMaker", order = 3)]
-    public class CollectionMaker : TextureMaker, IGenerator
+    public class CollectionMaker : Maker, IGenerator
     {
         [Serializable] public class InputData
         {
@@ -217,7 +217,7 @@ namespace Custom.Generators.Makers
         }
     }
 }
-
+#endif
 
 
 

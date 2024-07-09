@@ -22,14 +22,13 @@ REFS-N-LINKS:
     AMD TressFX : https://github.com/GPUOpen-Effects/TressFX
     unityteam TressFX implementation : https://github.com/Unity-Technologies/com.unity.demoteam.mesh-to-sdf/tree/main
 */
-
+#if UNITY_EDITOR
 using System.IO;
 using System.Collections.Generic;
 
 using UnityEngine;
 using UnityEditor;
 using System.Linq;
-
 
 namespace Custom.Generators.Modules
 {
@@ -704,7 +703,7 @@ namespace Custom.Generators.Modules
 
     }
 }
-
+#endif
 
 
 //____________________________________________________________________ FOOTNOTES
