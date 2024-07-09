@@ -51,9 +51,12 @@ Pass
     struct v2f {
 
         float4 pos : SV_POSITION;
+
         float2 uv : TEXCOORD0;
-        float3 view : TEXCOORD1;
-        float3 nor : NORMAL;
+        
+        half3 view : TEXCOORD1;
+        half3 nor : NORMAL;
+        
         float4 col : COLOR0; // used for field data
 
         uint inst : SV_InstanceID;
@@ -176,19 +179,16 @@ Pass
         uint2 grid = (uint2)_Grid;
 
         v2f o; 
-        o.inst = instanceID; 
-        o.col = 0; o.nor = 0;
+        o.inst = instanceID; o.view = 0;
 
         float3 pos = v.vertex.xyz * 2.0;
-
         o.pos = float4(pos,0) * 0.999;
         o.uv = o.pos * 0.5 + 0.5;
-        o.view = 0;
-
+        
         
         if      (_Modes[0] == 0) AltiVert(o);
         else if (_Modes[0] == 1) GravityVert(o);
-        else if (_Modes[0] == 2) PlateformVert(o);
+        else PlateformVert(o);
         
 
         float4 wpos = mul(FieldToWorld(instanceID), float4( o.pos.xyz * 0.5, 1.0));
