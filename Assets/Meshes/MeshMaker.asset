@@ -12,3 +12,5 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d57cc62af2597ce489945302fff6c015, type: 3}
   m_Name: MeshMaker
   m_EditorClassIdentifier: 
+  numVertX: 64
+  numVertY: 64

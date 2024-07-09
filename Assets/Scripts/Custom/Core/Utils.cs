@@ -508,6 +508,7 @@ namespace Custom
             return mesh;
         }
 
+#if UNITY_EDITOR
         public static void SaveMeshAsset(Mesh mesh, string pathWithoutExt)
         {
             string path = pathWithoutExt + ".asset";
@@ -526,6 +527,7 @@ namespace Custom
                 AssetDatabase.Refresh();
             }
         }
+#endif
     }
 
     public static class VectorUtils

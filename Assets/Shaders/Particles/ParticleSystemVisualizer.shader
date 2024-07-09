@@ -86,6 +86,15 @@ Pass
 
     
  
+    // static int trisOffset [6] = {
+    //     0,
+    //     _Grid.x,
+    //     1,
+    //     1,
+    //     _Grid.x,
+    //     _Grid.x + 1,
+    // };
+    
     static int trisOffset [6] = {
         0,
         _Grid.x,
