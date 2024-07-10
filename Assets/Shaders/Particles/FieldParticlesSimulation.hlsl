@@ -78,9 +78,12 @@ float4 _UVB[FIELDS_INDEX + NUM_FIELDS];
 #define FieldData(id)  _UVB[FIELDS_INDEX + id] // x : linear 2D scale, y : depth scale, z = fieldTexId
 
 // Unpack Matrices
-float4x4 _UMB[NUM_FIELDS * 2];
+float4x4 _UMB[NUM_FIELDS * 2 + NUM_EMITTERS];
 #define WorldToField(id) _UMB[id * 2]
 #define FieldToWorld(id) _UMB[id * 2 + 1]
+
+#define EmitterToWorld(id) _UMB[NUM_FIELDS * 2 + id]
+
 
 #define FieldWorldPos(id) FieldToWorld(id)._m03_m13_m23
 
@@ -96,11 +99,7 @@ float4x4 _UMB[NUM_FIELDS * 2];
 #define SIMULATION
 #include "../Includes/Particles.hlsl"
 
-
-// Buffers
-RWStructuredBuffer<ParticleData> _Particles;
-StructuredBuffer<EmitterData> _Emitters; // No iteration through this, can be a texture buffer (variable size)!
-
+// RWStructuredBuffer<ParticleData> _Particles;
 
 #define DomainPos(pos) (pos - _Origin.xyz) / MinComp(_Extents.xyz);
 
@@ -194,11 +193,11 @@ bool CheckReset(uint id, inout ParticleData P){
     // out bounds
     if( (Dot2(bounds) > 0.001) || P.life < 0.0001){
 
-        EmitterData emitter = _Emitters[id % (int)_Settings[1]];
+        float4x4 emittToWorld = EmitterToWorld(id % (int)_Settings[1]);
 
         float3 rand = Hash31(id * 10);
         P.pos = rand * 2 - 1; // Should be a texture !
-        P.pos = mul(emitter.txx, float4(P.pos * 0.5, 1)).xyz;
+        P.pos = mul(emittToWorld, float4(P.pos * 0.5, 1)).xyz;
         
         #if  PLATEFORM
             P.vel = normalize(rand * 2 - 1) * _Sim[0];
@@ -444,82 +443,65 @@ float3 GetPlateformAttractions(inout ParticleData P, uint id, out PlateformData 
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-float4 PSPlateform (uint2 id){
+float4 PSPlateform (uint3 ids){
  
     //--------------------------------------------- Get Buffer
-    ParticleData P = _Particles[id.x];
+    ParticleData P = UnpackBuffers(ids.xy);
 
-    bool state = GetState(id.x);
+    bool state = GetState(ids.z);
     if(!state) P.life = 0;
 
-    CheckReset(id.x, P);
+    CheckReset(ids.z, P);
 
     //--------------------------------------------- Get Closets Field
     float3 acc = 0;
     PlateformData data; float3 fieldPos;
 
-    acc = GetPlateformAttractions(P, id.x, data, fieldPos);
+    acc = GetPlateformAttractions(P, ids.z, data, fieldPos);
 
     ApplyAcceleration(P.vel, acc);
-    ApplyVelocity(P.pos, P.vel);
 
     P.life -= _Times[1] / _Times[3];
 
-    //-------------------------------------------- Update buffers
-    _Particles[id.x] = P;
-
-    return 0;
+    return PackVelocity(P);
 }
 ////////////////////////////////////////////////////////////////////////////////
-float4 PSAltiPath (uint2 id){
+float4 PSAltiPath (uint3 ids){
 
     //--------------------------------------------- Read Buff
-    ParticleData P = _Particles[id.x];
+    ParticleData P = UnpackBuffers(ids.xy);
 
-    bool state = GetState(id.x);
+    bool state = GetState(ids.z);
     if(!state) P.life = 0;
 
-    CheckReset(id.x, P);
+    CheckReset(ids.z, P);
 
-    //--------------------------------------------- Get Closets Field
-    float3 acc = GetPathFieldsAcceleration(P, id.x);
+    float3 acc = GetPathFieldsAcceleration(P, ids.z);
 
     ApplyAcceleration(P.vel, acc);
-    ApplyVelocity(P.pos, P.vel);
 
-    //-------------------------------------------- Update buffers
     P.life -= _Times[1] / _Times[3];
 
-    _Particles[id.x] = P;
-
-    return 0;
+    return PackVelocity(P);
 }
 ////////////////////////////////////////////////////////////////////////////////
-float4 PSGravity (uint2 id){
+float4 PSGravity (uint3 ids){
  
-    //--------------------------------------------- Get Buffer
-    ParticleData P = _Particles[id.x];
+    ParticleData P = UnpackBuffers(ids.xy);
 
-    bool state = GetState(id.x);
+    bool state = GetState(ids.z);
     if(!state) P.life = 0;
 
-    CheckReset(id.x, P);
+    CheckReset(ids.z, P);
     
-    //--------------------------------------------- Apply Forces
     float3 grav = GetSteer(P.vel, float3(0,-9.8,0)) * _Weights_A[0];
     ApplyAcceleration(P.vel, grav);
 
     CollideGravityFields(P);
     
-
-    ApplyVelocity(P.pos, P.vel);
-
     P.life -= _Times[1] / _Times[3];
 
-    //-------------------------------------------- Update buffers
-    _Particles[id.x] = P;
-
-    return 0;
+    return PackVelocity(P);
 }
 
 

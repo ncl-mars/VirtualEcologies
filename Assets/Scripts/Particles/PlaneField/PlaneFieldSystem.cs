@@ -1,24 +1,9 @@
-// /*
-//     TODO :
-//         + Lessen calls to GPU in SetCompute()
-//         Tex size in vector ? Uniform Buffer ? CommandBuffer ?
-
-//     PORTABILITY :
-//         fallback on texture + pix shader for switch in place of computes (shader + buffer)
-//         need to check compatibility for half type on switch => encode 8 components in RGBAFloat
-
-//     TECHNOS :
-//         - full gpu with args and variable instances count
-//         https://docs.unity3d.com/ScriptReference/Graphics.RenderMeshIndirect.html
-
-//         - full gpu without args and fixed instances count
-//         https://docs.unity3d.com/ScriptReference/Graphics.RenderMeshPrimitives.html
-// */
+/*
+*/
 
 using UnityEngine;
-// using System;
 using UnityEditor;
-
+// using System;
 
 namespace Custom.Particles
 {
@@ -28,7 +13,7 @@ namespace Custom.Particles
     public class PlaneFieldSystem : ParticlesSystem
     {
         // theses are constants to be imported from mono script in inspector
-        [HideInInspector] public ComputeShader compute;
+        public Shader simulationShader;
         public Texture2D noiseTex; // common hash ?
 
         [SerializeField] private PlaneFieldSimulation simulation;
@@ -58,15 +43,15 @@ namespace Custom.Particles
             renderer.Draw(simulation.MaxCount);
         }
 
+
 #if UNITY_EDITOR
         //---------------------------------------------------------------------------------------
         [ContextMenu("Recreate serialized vectors")]
         private void RecreateSerialized()
         {
-            simulation.RecreateSerializedVectors();
-            
-            renderer.RecreateSerializedVectors();
-            renderer.RecreateSerializedTextures();
+            // simulation.RecreateSerializedVectors();
+            // renderer.RecreateSerializedVectors();
+            // renderer.RecreateSerializedTextures();
 
             AssetDatabase.ForceReserializeAssets(new List<string>(){AssetDatabase.GetAssetPath(this)});
         }

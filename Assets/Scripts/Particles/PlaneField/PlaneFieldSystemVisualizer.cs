@@ -11,18 +11,6 @@ using UnityEngine.Rendering;
 
 namespace Custom.Particles.PlaneField.Visualizer
 {
-    internal static class MateProps
-    {
-        internal static readonly string[] k_numFields       = {"_1xF", "_2xF", "_3xF", "_4xF"}; // NUM_FIELDS
-
-        internal static readonly string keyTexArray = "_FIELD_TEXARRAY";
-
-        internal static readonly int uvb   = Shader.PropertyToID("_UVB");
-        internal static readonly int umb  = Shader.PropertyToID("_UMB");
-
-        internal static readonly int textures  = Shader.PropertyToID("_FieldTex");
-    }
-
     public enum State : int
     {
         Hide = 0,
@@ -32,6 +20,15 @@ namespace Custom.Particles.PlaneField.Visualizer
     [ExecuteInEditMode]
     public class PlaneFieldSystemVisualizer : MonoBehaviour
     {
+        internal static class MateProps
+        {
+            internal static readonly string[] k_numFields       = {"_1xF", "_2xF", "_3xF", "_4xF"}; // NUM_FIELDS
+            internal static readonly string k_fieldTexArray = "_FIELD_TEXARRAY";
+            internal static readonly int uvb   = Shader.PropertyToID("_UVB");
+            internal static readonly int umb  = Shader.PropertyToID("_UMB");
+            internal static readonly int textures  = Shader.PropertyToID("_FieldTex");
+        }
+
         //---------------------------------------------------------------------
         private PlaneFieldSystem system;
         [SerializeField] private ParticlesSceneObjects sceneObjects;
@@ -162,11 +159,11 @@ namespace Custom.Particles.PlaneField.Visualizer
             
             if(fieldTex.dimension == TextureDimension.Tex2DArray)
             {
-                i_material.EnableKeyword(CSProps.k_fieldTexArray);
+                i_material.EnableKeyword(MateProps.k_fieldTexArray);
             }
 
             int numFields = Mathf.Clamp(umb.Length / 2, 1, 4); // WARNING !, numField cached?
-            i_material.EnableKeyword(CSProps.k_numFields[numFields - 1]);
+            i_material.EnableKeyword(MateProps.k_numFields[numFields - 1]);
 
             renderParams.matProps.SetVectorArray(MateProps.uvb, uvb);
             renderParams.matProps.SetMatrixArray(MateProps.umb, umb);

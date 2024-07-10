@@ -13,131 +13,106 @@ namespace Custom.Particles.PlaneField
         Plateform     = 4,
     }
 
-    ///////////////////////////////////////////////////////////////////////////////////
-    internal static class CSProps
-    {
-        //----------------------- LABELS
-        internal static readonly string[] k_names    = {
-            "CSAltiPath",
-            "CSGravTopo",
-            "CSPlateform"
-        };
-
-        internal static readonly string[] k_numFields       = {"_1xF", "_2xF", "_3xF", "_4xF"}; // NUM_FIELDS
-        internal static readonly string k_fieldTexArray     = "_FIELD_TEXARRAY";
-
-        //----------------------- GLOBALS / CONSTANT
-        internal static readonly int    g_vectors   = Shader.PropertyToID("_GV");
-        internal static readonly int[]  g_textures  = {
-            Shader.PropertyToID("_NoiseTex"),
-        };
-
-        //----------------------- UNIFORMS/VARYING Array
-        internal static readonly int uvb   = Shader.PropertyToID("_UVB");
-        // 0: settings : numParticles, numEmitters, fieldWidth, fieldHeight
-        // 1: times    : time, deltaTime, delayStart,
-        // 2: origin
-        // 3: extents
-        // 4: simParams
-        // 5: weights
-
-        internal static readonly int umb  = Shader.PropertyToID("_UMB");
-
-        //----------------------- COMPUTE BUFFER
-        internal static readonly int[] u_buffers = {
-            Shader.PropertyToID("_Particles"),
-            Shader.PropertyToID("_Emitters"),
-        };
-        //----------------------- TEXTURES
-        internal static readonly int[] textures = {
-            Shader.PropertyToID("_FieldTex"),
-        };
-    }
-
-    //-- Particles Buffer, TODO : FallBack to texture buffer
-    public class EmittersHandler : ParticlesBufferHandler
-    {
-        public struct Data // particule data
-        {
-            public Matrix4x4 txx;
-            public static int Size{get=>Marshal.SizeOf<Data>();}
-        }
-
-        Data[] data;
-
-        public void SetFromEmitter(ParticlesEmitter emitter, int id)
-        {
-            data[id].txx = emitter.transform.localToWorldMatrix;
-            buffer.SetData(data, id, id, 1);
-        }
-        
-        public EmittersHandler(ParticlesSimulation _, ParticlesSceneObjects scene)
-        {
-            buffer = new ComputeBuffer(scene.emitters.Length, Data.Size, ComputeBufferType.Constant);
-            buffer.SetData(InitData(scene.emitters));
-        }
-
-        private Array InitData(ParticlesEmitter[] emitters)
-        {
-            data = new Data[emitters.Length];
-            for(int i = 0; i < data.Length; i++){
-                data[i].txx = emitters[i].transform.localToWorldMatrix;
-            }
-            return data;
-        }
-    }
 
     //-- Particles Buffer
-    public class ParticlesHandler : ParticlesBufferHandler
+    public class ParticlesBuffers
     {
-        public struct Data // particule data, should fit in 2 textures (2*vector4)
-        {
-            public Vector3 vel;
-            public float zone;
+        private readonly RenderTexture[] buffers;
+        public RenderTexture[] Buffers{get=>buffers;}
 
-            public Vector3 pos;
-            public float life; // life, zone
+        public RenderTexture Positions{ get=>buffers[0];}
+        public RenderTexture Velocities{get=>buffers[1];}
+
+        public ParticlesBuffers(ParticlesSimulation simulation, ParticlesSceneObjects scene)
+        {
+            int dim = Mathf.CeilToInt(Mathf.Sqrt(simulation.MaxCount));
+
+            Debug.Log("Creating particles texture buffers with size : "+ dim + " * " + dim);
             
-            public static int Size{get=>Marshal.SizeOf<Data>();}
-        }
+            buffers = new RenderTexture[2];
+            Texture2D[] tmpBuffers = new Texture2D[buffers.Length];
 
-        public ParticlesHandler(ParticlesSimulation simulation, ParticlesSceneObjects scene)
-        {
-            buffer = new ComputeBuffer(simulation.MaxCount, Data.Size);
-            buffer.SetData(InitData(scene.emitters));
-        }
-
-        private Array InitData(ParticlesEmitter[] emitters)
-        {
-            Data[] data = new Data[buffer.count];
-
-            for(int i = 0; i < buffer.count; i++)
+            for(int i = 0; i < buffers.Length; i++)
             {
+                buffers[i] = new RenderTexture(dim, dim, 0, RenderTextureFormat.ARGBFloat){};
+                buffers[i].Create();
+
+                tmpBuffers[i] = TexUtils.CreateFloatTexFromRTex(buffers[i]);
+            }
+
+            for(int i = 0; i < simulation.MaxCount; i++)
+            {
+                int X = i % dim;
+                int Y = Mathf.FloorToInt(i/dim);
+
                 Vector3 randPos = VectorUtils.Random3() * 0.5f;
-                Transform trs = emitters[i%emitters.Length].transform;
+
+                Transform trs = scene.emitters[i%scene.emitters.Length].transform;
                 randPos = trs.localToWorldMatrix.MultiplyPoint(randPos);
                 
-                data[i] = new()
-                {
-                    // vel = VectorUtils.Random3().normalized,
-                    pos = randPos,
-                    vel = Vector3.zero,
-                    life = 1.0f,
-                    zone = -1.0f,
-                };
+                Vector4 velocity = new(0,0,0,-1);
+                Vector4 position = new(randPos.x, randPos.y, randPos.z, 1);
+
+                tmpBuffers[0].SetPixel(X, Y, position);
+                tmpBuffers[1].SetPixel(X, Y, velocity);
             }
-            return data;
+
+            for(int i = 0; i < buffers.Length; ++i)
+            {
+                tmpBuffers[i].Apply();
+                Graphics.Blit(tmpBuffers[i], buffers[i]);
+                UnityEngine.Object.Destroy(tmpBuffers[i]);
+            }
+        }
+
+        public void Dispose()
+        {
+            for(int i = 0; i < buffers.Length; i++)
+            {
+                buffers[i].Release();
+            }
         }
     }
 
     ///////////////////////////////////////////////////////////////////////////////////
     [Serializable] public class PlaneFieldSimulation : ParticlesSimulation
     {
+        internal static class MateProps
+        {
+            internal static readonly string[] k_names    = {
+                "_ALTI_PATH",
+                "_GRAV_TOPO",
+                "_PLATEFORM"
+            };
+
+            internal static readonly string[] k_numFields       = {"_1xF", "_2xF", "_3xF", "_4xF"}; // NUM_FIELDS
+            internal static readonly string[] k_numEmitts       = {"_1xE", "_2xE", "_3xE", "_4xE"}; // NUM_EMITTER
+            internal static readonly string k_fieldTexArray     = "_FIELD_TEXARRAY";
+
+            //----------------------- GLOBALS / CONSTANT
+            internal static readonly int    g_vectors   = Shader.PropertyToID("_GV");
+            internal static readonly int[]  g_textures  = {
+                Shader.PropertyToID("_NoiseTex"),
+            };
+
+            //----------------------- buffers
+            internal static readonly int uvb   = Shader.PropertyToID("_UVB");
+            internal static readonly int umb  = Shader.PropertyToID("_UMB");
+
+            internal static readonly int[] buffers      = {
+                Shader.PropertyToID("_Positions"),
+                Shader.PropertyToID("_Velocities"),
+            };
+
+            //----------------------- TEXTURES
+            internal static readonly int[] textures = {
+                Shader.PropertyToID("_FieldTex"),
+            };
+        }
+
         [SerializeField] private SimulationMode mode = SimulationMode.AltitudePath;
         public SimulationMode Mode{get => mode; set => mode = value;}
         
-        // global textures, for all instance of the shader
-        // [SerializeField] 
         private Texture[] g_textures = new Texture[1]; 
 
         [SerializeField] private Texture[] textures = new Texture[1];
@@ -146,11 +121,8 @@ namespace Custom.Particles.PlaneField
         // matrices array, 0: Domain To Field, 1: FieldToDomain
         private Matrix4x4[] umb = new Matrix4x4[2];
 
-        // buffer handlers
-        private ParticlesHandler particles;
-        private EmittersHandler emitters;
-
-        public override ComputeBuffer ParticlesBuffer{get => particles.Buffer;}
+        private ParticlesBuffers particles;
+        public override RenderTexture[] Buffers{get => particles.Buffers;}
 
         const int fieldsIndex = 8; // in uvb, end of "params uniforms"
 
@@ -162,20 +134,60 @@ namespace Custom.Particles.PlaneField
         {
             uvb ??= new Vector4[fieldsIndex]; // create without field
         }
+        
+        public void Init(PlaneFieldSystem system, ParticlesSceneObjects scene)
+        {
+            this.material = new Material(system.simulationShader); // or hold the keyword
+            this.scene = scene;
+
+            g_textures = new Texture2D[]{system.noiseTex};
+
+            // 0 : settings, x : numParticles
+            uvb[0][1] = scene.emitters.Length;  // y : numEmitters
+            uvb[0][2] = textures[0].width;      // z : field width
+            uvb[0][3] = textures[0].height;     // w : field height
+
+            DomainTransform = scene.domain.transform;   // 2 : origin, 3: extents
+            uvb[3][3] = system.transform.lossyScale.y;
+
+            InitSceneData();
+
+            particles = new ParticlesBuffers(this, scene);
+
+            InitMaterial();
+            RegisterSceneObjects();
+        }
+
+        public void InitSceneData()
+        {
+            CheckRecreateUVB();
+
+            umb = new Matrix4x4[scene.fields.Length * 2 + scene.emitters.Length];
+            
+            for(int i = 0; i < scene.fields.Length; i++)    SetFromField(scene.fields[i], i);
+            for(int i = 0; i < scene.emitters.Length; i++)  SetFromEmitter(scene.emitters[i], i);
+        }
 
         public void SetFromField(ParticlesForceField field, int bufferIndex)
         {
+            // vectors
             uvb[fieldsIndex + bufferIndex][0] = field.transform.lossyScale.y;
             uvb[fieldsIndex + bufferIndex][1] = field.transform.lossyScale.z;
             uvb[fieldsIndex + bufferIndex][2] = field.FieldTextureID;
-
+            // matrices
             umb[bufferIndex * 2]       = field.transform.worldToLocalMatrix; // (data need invert transpose matrices for scales)
             umb[bufferIndex * 2 + 1]   = field.transform.localToWorldMatrix;
         }
 
-        public void InitFieldsData(ParticlesForceField[] fields)
+        public void SetFromEmitter(ParticlesEmitter emitter, int bufferIndex)
         {
-            int arrLength = fieldsIndex + fields.Length;
+            int index = scene.fields.Length * 2 + bufferIndex;
+            umb[index] = emitter.transform.localToWorldMatrix;
+        }
+
+        public void CheckRecreateUVB()
+        {
+            int arrLength = fieldsIndex + scene.fields.Length;
             
             if(uvb.Length != arrLength)
             {
@@ -183,65 +195,39 @@ namespace Custom.Particles.PlaneField
                 Array.Copy(uvb, 0, vectors, 0, Mathf.Min(arrLength, uvb.Length));
                 uvb = vectors;
             }
-
-            umb = new Matrix4x4[fields.Length * 2];
-            
-            for(int i = 0; i < fields.Length; i++) SetFromField(fields[i], i);
-        }
-        
-        public void Init(PlaneFieldSystem system, ParticlesSceneObjects scene)
-        {
-            this.compute = UnityEngine.Object.Instantiate(system.compute); // or hold the keyword
-            this.scene = scene;
-
-            g_textures = new Texture2D[]{system.noiseTex};
-
-            // 0 : settings, x : numParticles
-            uvb[0][1] = scene.emitters.Length;    // y : numEmitters
-            uvb[0][2] = textures[0].width;      // z : field width
-            uvb[0][3] = textures[0].height;     // w : field height
-
-            DomainTransform = scene.domain.transform;   // 2 : origin, 3: extents
-            uvb[3][3] = system.transform.lossyScale.y;
-            // Debug.Log("setting domain scale at : " + uvb[3][3]);
-
-            InitFieldsData(scene.fields);
-
-            particles = new ParticlesHandler(this, scene);
-            emitters  = new EmittersHandler(this, scene);
-
-            InitCompute();
-
-            RegisterSceneObjects();
         }
 
-        private void InitCompute()
+        private void InitMaterial()
         {
+            // enable simulation mode
             int indexMode = Array.IndexOf(Enum.GetValues(mode.GetType()), mode);
-            kernelID = compute.FindKernel(CSProps.k_names[ Mathf.Clamp( indexMode, 0, CSProps.k_names.Length) ]); // to prevent errors
+            string simKey = MateProps.k_names[ Mathf.Clamp( indexMode, 0, MateProps.k_names.Length)];
+            material.EnableKeyword(simKey);
 
-            warpCount = ComputeUtils.Get1DWarpCount(compute, kernelID, MaxCount);
+            // enable num fields
+            int numFields = Mathf.Clamp(scene.fields.Length, 1, 4); // WARNING !, numField cached?
+            material.EnableKeyword(MateProps.k_numFields[numFields - 1]);
+    
+            // enable num emitters
+            int numEmitts = Mathf.Clamp(scene.emitters.Length, 1, 4); // WARNING !, numField cached?
+            material.EnableKeyword(MateProps.k_numEmitts[numEmitts - 1]);
 
-            // keywords
-            int numFields = Mathf.Clamp(umb.Length / 2, 1, 4); // WARNING !, numField cached?
-            compute.EnableKeyword(CSProps.k_numFields[numFields - 1]);
-            
+            // enable field texture mode
             if(textures[0].dimension == TextureDimension.Tex2DArray){
-                compute.EnableKeyword(CSProps.k_fieldTexArray);
+                material.EnableKeyword(MateProps.k_fieldTexArray);
             }
             
             // Set Datas
-            // Debug.Log("set global noise with tex name : " + g_textures[0].name);
-            compute.SetTexture(kernelID, CSProps.g_textures[0], g_textures[0]);
-            compute.SetVector(CSProps.g_vectors, new Vector4( g_textures[0].width, g_textures[0].height, 0, 0));
-            
-            compute.SetTexture(kernelID, CSProps.textures[0], textures[0]);
+            material.SetTexture(MateProps.g_textures[0], g_textures[0]);    // noises
+            material.SetTexture(MateProps.textures[0], textures[0]);        // fields
 
-            compute.SetBuffer(kernelID, CSProps.u_buffers[0], particles.Buffer);
-            compute.SetBuffer(kernelID, CSProps.u_buffers[1], emitters.Buffer);
+            material.SetVector(MateProps.g_vectors, new Vector4( g_textures[0].width, g_textures[0].height, 0, 0)); // noise dimen
             
-            compute.SetMatrixArray(CSProps.umb, umb);
-            compute.SetVectorArray(CSProps.uvb, uvb);
+            material.SetMatrixArray(MateProps.umb, umb);
+            material.SetVectorArray(MateProps.uvb, uvb);
+
+            material.SetTexture(MateProps.buffers[0], particles.Positions);     // position
+            material.SetTexture(MateProps.buffers[1], particles.Velocities);    // velocity
         }
 
         private void UpdateTimes()
@@ -253,21 +239,26 @@ namespace Custom.Particles.PlaneField
         public void Run()
         {
             UpdateTimes();
-            compute.SetVectorArray(CSProps.uvb, uvb); // update vectors each frame
+            material.SetVectorArray(MateProps.uvb, uvb); // update vectors each frame
 
             if(hasMatrixUpdate)
             {
-                compute.SetMatrixArray(CSProps.umb, umb);
+                material.SetMatrixArray(MateProps.umb, umb);
                 hasMatrixUpdate = false;
             }
 
-            compute.Dispatch(kernelID, warpCount, 1, 1);
+            RenderTexture.active = null;
+
+            // material.SetTexture(MateProps.buffers[0], particles.Positions);     // position
+            // material.SetTexture(MateProps.buffers[1], particles.Velocities);    // velocity
+
+            Graphics.Blit(null, particles.Velocities, material, 0);
+            Graphics.Blit(null, particles.Positions, material, 1);
         }
         
         public override void Dispose()
         {
             UnregisterSceneObjects();
-            emitters?.Dispose();
             particles?.Dispose();
         }
 
@@ -280,7 +271,7 @@ namespace Custom.Particles.PlaneField
 
         public void OnEmitterChanged(ParticlesEmitter emitter, int bufferIndex)
         {
-            emitters.SetFromEmitter(emitter, bufferIndex);
+            SetFromEmitter(emitter, bufferIndex);
             hasMatrixUpdate = true;
         }
 
@@ -318,7 +309,7 @@ namespace Custom.Particles.PlaneField
             }
         }
     
-        //---------------------------------------------------------------------------------------
+#if UNITY_EDITOR
         public void RecreateSerializedVectors()
         {
             Debug.Log("recreating serialized object");
@@ -331,8 +322,132 @@ namespace Custom.Particles.PlaneField
             Array.Copy(uvb, 0, vectors, 0, Mathf.Min(fieldsIndex, uvb.Length));
             uvb = vectors;
         }
+#endif
     }
 }
+
+
+
+
+
+
+
+    // //-- Particles Buffer
+    // public class ParticlesHandler : ParticlesBufferHandler
+    // {
+    //     public struct Data // particule data, should fit in 2 textures (2*vector4)
+    //     {
+    //         public Vector3 vel;
+    //         public float zone;
+
+    //         public Vector3 pos;
+    //         public float life; // life, zone
+            
+    //         public static int Size{get=>Marshal.SizeOf<Data>();}
+    //     }
+
+    //     public ParticlesHandler(ParticlesSimulation simulation, ParticlesSceneObjects scene)
+    //     {
+    //         buffer = new ComputeBuffer(simulation.MaxCount, Data.Size);
+    //         buffer.SetData(InitData(scene.emitters));
+    //     }
+
+    //     private Array InitData(ParticlesEmitter[] emitters)
+    //     {
+    //         Data[] data = new Data[buffer.count];
+
+    //         for(int i = 0; i < buffer.count; i++)
+    //         {
+    //             Vector3 randPos = VectorUtils.Random3() * 0.5f;
+    //             Transform trs = emitters[i%emitters.Length].transform;
+    //             randPos = trs.localToWorldMatrix.MultiplyPoint(randPos);
+                
+    //             data[i] = new()
+    //             {
+    //                 // vel = VectorUtils.Random3().normalized,
+    //                 pos = randPos,
+    //                 vel = Vector3.zero,
+    //                 life = 1.0f,
+    //                 zone = -1.0f,
+    //             };
+    //         }
+    //         return data;
+    //     }
+    // }
+
+
+        // public struct Data // particule data, should fit in 2 textures (2*vector4)
+        // {
+        //     public Vector4 velocities;
+        //     public Vector4 positions;
+
+        //     // public Vector3 vel;
+        //     // public float zone;
+        //     // public Vector3 pos;
+        //     // public float life; // life, zone
+        // }
+
+
+        // public void CheckCreateUVB()
+        // {
+        //     int arrLength = fieldsIndex + scene.fields.Length;
+            
+        //     if(uvb.Length != arrLength)
+        //     {
+        //         Vector4[] vectors = new Vector4[arrLength];
+        //         Array.Copy(uvb, 0, vectors, 0, Mathf.Min(arrLength, uvb.Length));
+        //         uvb = vectors;
+        //     }
+        // }
+
+        // public void CheckCreateUMB()
+        // {
+        //     int arrLength = scene.fields.Length * 2 + scene.emitters.Length;
+            
+        //     umb = new Matrix4x4[arrLength];
+            
+        //     if(uvb.Length != arrLength)
+        //     {
+        //         Vector4[] vectors = new Vector4[arrLength];
+        //         Array.Copy(uvb, 0, vectors, 0, Mathf.Min(arrLength, uvb.Length));
+        //         uvb = vectors;
+        //     }
+
+        //     umb = new Matrix4x4[fields.Length * 2];
+        // }
+
+    // //-- Particles Buffer, TODO : FallBack to texture buffer
+    // public class EmittersHandler : ParticlesBufferHandler
+    // {
+    //     public struct Data // particule data
+    //     {
+    //         public Matrix4x4 txx;
+    //         public static int Size{get=>Marshal.SizeOf<Data>();}
+    //     }
+
+    //     Data[] data;
+
+    //     public void SetFromEmitter(ParticlesEmitter emitter, int id)
+    //     {
+    //         data[id].txx = emitter.transform.localToWorldMatrix;
+    //         buffer.SetData(data, id, id, 1);
+    //     }
+        
+    //     public EmittersHandler(ParticlesSimulation _, ParticlesSceneObjects scene)
+    //     {
+    //         buffer = new ComputeBuffer(scene.emitters.Length, Data.Size, ComputeBufferType.Constant);
+    //         buffer.SetData(InitData(scene.emitters));
+    //     }
+
+    //     private Array InitData(ParticlesEmitter[] emitters)
+    //     {
+    //         data = new Data[emitters.Length];
+    //         for(int i = 0; i < data.Length; i++){
+    //             data[i].txx = emitters[i].transform.localToWorldMatrix;
+    //         }
+    //         return data;
+    //     }
+    // }
 
 
 

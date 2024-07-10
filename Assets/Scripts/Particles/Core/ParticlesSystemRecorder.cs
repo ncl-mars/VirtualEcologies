@@ -1,6 +1,4 @@
-/*
-*/
-#if UNITY_EDITOR
+
 using System;
 using UnityEngine;
 
@@ -11,6 +9,7 @@ namespace Custom.Particles
     {
         [SerializeField] private ParticlesSystemData dataBase;
 
+#if UNITY_EDITOR
         private void OnEnable()
         {
             if(dataBase == null) return;
@@ -30,6 +29,6 @@ namespace Custom.Particles
                 dataBase.WriteSystem(this, system);
             }
         }
+#endif
     }
 }
-#endif

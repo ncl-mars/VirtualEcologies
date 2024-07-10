@@ -22,6 +22,12 @@ namespace Custom.Particles.PlaneField
         static class MateProps
         {
             internal static readonly int buffer         = Shader.PropertyToID("_Particles");
+            
+            internal static readonly int[] buffers      = {
+                Shader.PropertyToID("_Positions"),
+                Shader.PropertyToID("_Velocities"),
+            };
+
             internal static readonly int sprites        = Shader.PropertyToID("_Sprites");
 
             internal static readonly int[] maps        = {Shader.PropertyToID("_BumpMap")};
@@ -73,7 +79,10 @@ namespace Custom.Particles.PlaneField
                 matProps = new()
             };
 
-            rp.matProps.SetBuffer(MateProps.buffer, simulation.ParticlesBuffer);
+
+            rp.matProps.SetTexture(MateProps.buffers[0], simulation.Buffers[0]); // position
+            rp.matProps.SetTexture(MateProps.buffers[1], simulation.Buffers[1]); // velocity
+
             rp.matProps.SetTexture(MateProps.sprites, spriteCollection);
 
             if(textures[0] != null) rp.matProps.SetTexture(MateProps.maps[0], textures[0]);
@@ -90,7 +99,8 @@ namespace Custom.Particles.PlaneField
 
         public RenderParams Update(ParticlesSimulation simulation)
         {
-            renderParams.matProps.SetBuffer(MateProps.buffer, simulation.ParticlesBuffer);
+            renderParams.matProps.SetTexture(MateProps.buffers[0], simulation.Buffers[0]); // position
+            renderParams.matProps.SetTexture(MateProps.buffers[1], simulation.Buffers[1]); // velocity
             renderParams.matProps.SetVectorArray(MateProps.uvb, uvb);
             
             return renderParams;
@@ -103,6 +113,8 @@ namespace Custom.Particles.PlaneField
 
         public override void Dispose(){}
 
+
+#if UNITY_EDITOR
         public void RecreateSerializedVectors()
         {
             Debug.Log("recreating serialized object");
@@ -132,5 +144,6 @@ namespace Custom.Particles.PlaneField
             }
             textures = (Texture[])m_textures.Clone();
         }
+#endif
     }
 }

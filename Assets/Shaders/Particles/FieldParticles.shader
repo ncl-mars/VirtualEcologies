@@ -71,9 +71,9 @@ Pass
     UNITY_DECLARE_TEX2DARRAY(_Sprites);
     Texture2D _NoiseTex;
     Texture2D _BumpMap;
-
     SamplerState SamplerLinearRepeat;
-    StructuredBuffer<ParticleData> _Particles;
+
+    // StructuredBuffer<ParticleData> _Particles;
 
     float4 _GV;
     #define _NumParticles   (int)_GV.x
@@ -102,11 +102,14 @@ Pass
 
         v2f o;
         float3 pos = v.vertex.xyz; // vertex is world pos
-        ParticleData data = _Particles[id]; 
+        // ParticleData data = _Particles[id];
+        
+        uint2 id2 = IdtToPtc(id, _Positions_TexelSize.zw);
+        ParticleData data = UnpackBuffers(id2); 
 
         //--------------------------------------------- apply S,R,T
         pos *= _Trs0[1] * REND_SCALE;
-        pos *= saturate(ceil(Dot2(data.vel))); // hide if no velocity
+        // pos *= saturate(ceil(Dot2(data.vel))); // hide if no velocity
 
         if(_Trs0[0] < 3.5){
             pos = -mul((float3x3)unity_CameraToWorld, pos);
@@ -182,9 +185,9 @@ Pass
 
 
     //======================================================= Fragment
-    float3 GetLights(v2f i){
+    float3 GetLights(v2f i, ParticleData P){
         
-        half3 view = normalize(_Particles[i.id].pos - _WorldSpaceCameraPos);
+        half3 view = normalize(P.pos - _WorldSpaceCameraPos);
         float4 bump = _BumpMap.Sample(SamplerLinearRepeat, i.uv);
         
         float3 bnor = TangentToWorld(i, bump.xyz);
@@ -223,6 +226,8 @@ Pass
 
     fixed4 frag (v2f i, uint id : SV_InstanceID) : SV_Target{
 
+        // return 1;
+
         //---------------------------------------------
         uint2 dim = pow((float)_NumParticles, 0.5);
         float2 posBoid = PtcToNtc(IdtToPtc(id, dim), dim);
@@ -234,11 +239,14 @@ Pass
         fixed4 col = UNITY_SAMPLE_TEX2DARRAY(_Sprites, float3(i.uv, slice) );
         clip(col.a - _Settings[0]); // discard on alpha
 
+
         //---------------------------------------------
-        // ParticleData data = _Particles[id];
+        uint2 id2 = IdtToPtc(id, _Positions_TexelSize.zw);
+        ParticleData P = UnpackBuffers(id2);
+
         col = i.color;
 
-        col.rgb = GetLights(i);
+        col.rgb = GetLights(i, P);
 
 
         return col;

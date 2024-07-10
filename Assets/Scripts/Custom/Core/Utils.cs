@@ -417,6 +417,24 @@ namespace Custom
             return tex;
         }
 
+        public static Texture2D CreateFloatTexFromRTex(RenderTexture rTex)
+        {
+            var format = rTex.format switch
+            {
+                RenderTextureFormat.RFloat  => TextureFormat.RFloat,
+                RenderTextureFormat.RGFloat => TextureFormat.RGFloat,
+                RenderTextureFormat.ARGBFloat => TextureFormat.RGBAFloat,
+                
+                RenderTextureFormat.RHalf  => TextureFormat.RHalf,
+                RenderTextureFormat.RGHalf => TextureFormat.RGHalf,
+                RenderTextureFormat.ARGBHalf => TextureFormat.RGBAHalf,
+
+                _ => TextureFormat.RGBAFloat,
+            };
+            Texture2D t = new(rTex.width, rTex.height, format, false){ filterMode = FilterMode.Point };
+            return t;
+        }
+
     }
 
     public static class MeshUtils

@@ -12,29 +12,12 @@ namespace Custom.Particles
         public ParticlesEmitter[] emitters;
     }
 
-    ///////////////////////////////////////////////////////////////////////////////////
-    public abstract class ParticlesBufferHandler
-    {
-        protected ComputeBuffer buffer;
-        public ComputeBuffer Buffer{get=>buffer;}
-
-        // public abstract void Create(ParticlesSimulation simulation, ParticlesSceneObjects scene);
-
-        public virtual void Dispose()
-        {
-            buffer?.Release();
-            buffer?.Dispose();
-        }
-    }
 
     ///////////////////////////////////////////////////////////////////////////////////
     public abstract class ParticlesSimulation
     {
-        protected ComputeShader compute;
+        [SerializeField] protected Material material;
         [SerializeField] protected Vector4[] uvb; // all params encapsulated in a vector array
-
-        protected int warpCount;
-        protected int kernelID; 
 
         //--------------------------------------------------------
         public virtual int MaxCount     { get => (int)uvb[0].x; set => uvb[0].x = value;}
@@ -52,11 +35,10 @@ namespace Custom.Particles
             }
         }
     
-        public abstract ComputeBuffer ParticlesBuffer{get;}
-        public abstract void Dispose();
-
-        // public abstract int Mode{get;set;}
+        public abstract RenderTexture[] Buffers{get;}
         public Vector4[] UVB{get => uvb; set => uvb = value;}
+
+        public abstract void Dispose();
     }
 
     ///////////////////////////////////////////////////////////////////////////////////

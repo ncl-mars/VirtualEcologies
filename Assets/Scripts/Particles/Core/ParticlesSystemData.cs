@@ -1,15 +1,16 @@
+
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEditor;
 using UnityEngine;
 
-#if UNITY_EDITOR
 namespace Custom.Particles
 {
     [CreateAssetMenu(fileName = "ParticlesData", menuName = "ScriptableObjects/Particles/System Data", order = 1)]
     public class ParticlesSystemData : ScriptableObject
     {
+#if UNITY_EDITOR
         [Serializable] public class TransformData
         {
             [SerializeField] private Vector3[][] v_transforms;
@@ -112,6 +113,6 @@ namespace Custom.Particles
                 dataRegister.Add(recorder, new(system));
             }
         }
+#endif
     }
 }
-#endif
