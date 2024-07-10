@@ -28,7 +28,7 @@ Pass
     #pragma vertex vert
     #pragma fragment frag
     
-    #pragma multi_compile _ALTI_PATH _GRAV_TOPO _PLATEFORM
+    #pragma shader_feature _ALTI_PATH _GRAV_TOPO _PLATEFORM
 
     #include "UnityCG.cginc"
     #include "../Includes/Quads.hlsl"

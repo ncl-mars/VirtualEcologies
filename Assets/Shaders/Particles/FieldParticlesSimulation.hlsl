@@ -1,20 +1,6 @@
-/*
-    // uint2 dim; _FieldTex.GetDimensions( dim.x, dim.y);
-
-    // uint2 dim; _TopoTex.GetDimensions( dim.x, dim.y);
-    // uint2 dim = uint2(_TopoWidth, _TopoHeight);
-
-
-    To set fixed update step :
-        "Edit > Settings > Time > Fixed Timestep"
-*/
-#pragma kernel CSAltiPath ALTI_PATH
-#pragma kernel CSGravTopo GRAV_TOPO
-#pragma kernel CSPlateform PLATEFORM
-
-#define THREAD_GROUP_SIZE 128
-
 #pragma multi_compile __ _1xF _2xF _3xF _4xF
+#pragma multi_compile __ _1xE _2xE _3xE _4xE
+
 #pragma multi_compile __ _FIELD_TEXARRAY
 
 #ifdef _1xF
@@ -28,6 +14,18 @@
 #else
     #define NUM_FIELDS 1
 #endif // NUM_FIELDS max = 4
+
+#ifdef _1xE
+    #define NUM_EMITTERS 1
+#elif _2xE
+    #define NUM_EMITTERS 2
+#elif _3xE
+    #define NUM_EMITTERS 3
+#elif _4xE
+    #define NUM_EMITTERS 4
+#else
+    #define NUM_EMITTERS 1
+#endif
 
 //---------------------------------------------------------- Structs and Uniforms
 // 2d path field
@@ -49,9 +47,6 @@ struct PlateformData{
     float dist;
     float depth;
 };
-
-#define MinComp(v) min(min(v.x, v.y), v.z)
-#define MaxComp(v) max(max(v.x, v.y), v.z)
 
 #include "../Includes/Noises.hlsl"
 #include "../Includes/Utils.hlsl"
@@ -100,6 +95,7 @@ float4x4 _UMB[NUM_FIELDS * 2];
 
 #define SIMULATION
 #include "../Includes/Particles.hlsl"
+
 
 // Buffers
 RWStructuredBuffer<ParticleData> _Particles;
@@ -448,8 +444,7 @@ float3 GetPlateformAttractions(inout ParticleData P, uint id, out PlateformData 
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-[numthreads(THREAD_GROUP_SIZE,1,1)]
-void CSPlateform (uint3 id : SV_DispatchThreadID){
+float4 PSPlateform (uint2 id){
  
     //--------------------------------------------- Get Buffer
     ParticleData P = _Particles[id.x];
@@ -472,10 +467,11 @@ void CSPlateform (uint3 id : SV_DispatchThreadID){
 
     //-------------------------------------------- Update buffers
     _Particles[id.x] = P;
+
+    return 0;
 }
 ////////////////////////////////////////////////////////////////////////////////
-[numthreads(THREAD_GROUP_SIZE,1,1)]
-void CSAltiPath (uint3 id : SV_DispatchThreadID){
+float4 PSAltiPath (uint2 id){
 
     //--------------------------------------------- Read Buff
     ParticleData P = _Particles[id.x];
@@ -495,10 +491,11 @@ void CSAltiPath (uint3 id : SV_DispatchThreadID){
     P.life -= _Times[1] / _Times[3];
 
     _Particles[id.x] = P;
+
+    return 0;
 }
 ////////////////////////////////////////////////////////////////////////////////
-[numthreads(THREAD_GROUP_SIZE,1,1)]
-void CSGravTopo (uint3 id : SV_DispatchThreadID){
+float4 PSGravity (uint2 id){
  
     //--------------------------------------------- Get Buffer
     ParticleData P = _Particles[id.x];
@@ -514,165 +511,16 @@ void CSGravTopo (uint3 id : SV_DispatchThreadID){
 
     CollideGravityFields(P);
     
+
     ApplyVelocity(P.pos, P.vel);
 
     P.life -= _Times[1] / _Times[3];
 
     //-------------------------------------------- Update buffers
     _Particles[id.x] = P;
+
+    return 0;
 }
 
 
 
-
-
-
-
-
-
-    //--------------------------------------------- Check Field Collisions
-    // #if NUM_FIELDS > 1
-    //     for(uint f = 0; f < NUM_FIELDS; f++)
-    //     {
-    //         if(CollideGravityField(P, f)) break;
-    //     }
-    // #else
-    //     CollideGravityField(P, 0);
-    // #endif
-
-    // uint idCloset;
-    // #if NUM_FIELDS > 1
-    //     float distance = sqrt(GetClosestField(P.pos, idClosest));
-    // #else
-    //     idClosest = 0;
-    //     distance = length(P.pos-FieldWorldPos(0));
-    // #endif
-
-
-
-
-
-// float3 GetAttractForce(float3 vel, float3 fieldPos, PathData field, uint idField, float noise){
-
-//     float3 attr = normalize(mul(transpose(WorldToField(idField)), float4(0,0,-1,0)).xyz);
-//     float diff = fieldPos.z - (field.depth + noise);
-//     return GetSteer(vel, attr) * diff;
-// }
-
-
-        // #if NUM_FIELDS == 1
-        //     float distance = length(P.pos - FieldWorldPos(curZoneID));
-        //     P.zone = curZoneID + min( distance/(MaxComp(_Extents.xyz) * 2.0), 0.999) * 0.1;
-        // #else
-        //     int idClosest;
-        //     float distance = sqrt(GetClosestField(P.pos, idClosest));
-        //     P.zone = curZoneID + (min(idClosest, 9)+min( distance/(MaxComp(_Extents.xyz)*2.0), 0.999)) * 0.1;
-        // #endif
-
-
-
-
-// float3 GetWorldPathsAttraction(inout ParticleData P, int curZoneID, uint id){
-
-//     #if NUM_FIELDS == 1 // field zero is attractor when out of its bounds
-//         P.zone = 0;
-//         return GetWorldBodyFallofAttraction(P.vel, P.pos, RandomizeFieldPosition(0, id)) * _Sim[2];
-
-//     #else 
-//         int idClosest;
-//         float distance = sqrt(GetClosestField(P.pos, idClosest));
-
-//         P.zone = curZoneID;
-
-//         if(idClosest == curZoneID) return 0;
-//         else{
-
-//             float3 fieldPos = mul(WorldToField(idClosest), float4(P.pos, 1)).xyz * 2.0;
-
-//             const float padding = 0.1;
-//             bool clip = Dot2(floor(abs(fieldPos) + padding)) < 0.5; // in field space
-
-//             if(clip){ // set as current zone, apply path acc next frame
-
-//                 P.zone = idClosest; // update current zone if inside
-//                 return 0;
-//             }
-//             else{ // go toward the field
-//                 return GetWorldBodyFallofAttraction(P.vel, P.pos, RandomizeFieldPosition(idClosest, id), distance) * _Sim[2]; 
-//             }
-//         }
-
-//         P.zone += min( distance/(MaxComp(_Extents.xyz) * 2.0), 0.999);
-
-//     #endif
-// }
-
-
-// float3 GetPlateformIncidence(float3 vel, float3 nor){
-
-//     float3 ref = reflect(vel, nor);
-//     float3 rec = refract(vel, nor, 1);
-//     float s = saturate( sign( dot(vel, -nor)) );
-//     // return lerp(ref, rec, s);
-
-//     return lerp(ref * (1.0 - (_Weights_A[1] * 0.5 + 0.5)), rec, s);
-// }
-
-
-
-// if(P.zone>=0) CollidePlateforms(P, data, fieldPos);
-
-
-// void CollidePlateforms(inout ParticleData P, PlateformData data, float3 fieldPos){
-
-//     float thresh = 0.025; // collisions
-//     float diff = abs(fieldPos.z) - (data.depth);
-
-//     bool inZone = (diff>-thresh) || (data.dist>-thresh);
-
-//     if(inZone) P.vel = GetPlateformIncidence(P.vel, data.nor) * 1.0;
-// }
-
-
-
-// float3 GetPlateformFieldsAcceleration(inout ParticleData P, float noiseBoid){
-
-//     const int zoneID = floor(P.zone);
-
-//     float3 fieldPos = mul(WorldToField(zoneID), float4(P.pos, 1)).xyz * 2.0;
-//     bool clip = Dot2(floor(abs(fieldPos))) < 0.5; // in field space
-
-//     if(clip) 
-//         return GetPlateformAcceleration(P, fieldPos, zoneID, noiseBoid);
-//     else {
-//         return GetWorldFieldsAttraction(P, noiseBoid, zoneID);
-    
-//     // return GetWorldFieldsAttraction(P, noiseBoid, zoneID);
-// }
-// float3 GetPlateformAcceleration(inout ParticleData P, float3 fieldPos, uint idField, uint id){
-
-//     float2 uv = abs(fieldPos.xy * 0.5 + 0.5);
-
-//     float sgn = sign(fieldPos.z);
-//     PlateformData data = GetPlateformData(uv, idField, sgn);
-    
-//     float thresh = -0.01; // collisions
-//     float diff = abs(fieldPos.z) - (data.depth + thresh);
-
-//     float3 acc = 0;
-
-//     if ( data.dist > -0.0)
-//     {
-//         float3 force = data.nor2 * (data.dist > 0 ? -1 : 1); 
-//         // acc +=  force * 1.0;
-//     }
-
-//     else {
-//         if(diff > 0 )
-//         {
-//             float3 ref = reflect(P.vel, -data.nor);
-//             P.vel = ref;
-//         }
-//     }
-//     return acc;
-// }

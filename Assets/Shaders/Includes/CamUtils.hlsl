@@ -2,6 +2,8 @@
 Camera utilitary functions
 */
 
+#ifndef CAM_UTILS_INCLUDED
+#define CAM_UTILS_INCLUDED
 
 void CreateCameraRay(in float2 uv, in float4x4 camToWorld, in float4x4 camInvProj, in float3 camWorldPos, 
                     out float3 ro, out float3 rd) 
@@ -44,3 +46,5 @@ float2 WorldToScreenUv(float3 worldPos, in float4x4 worldToCam, in float4x4 camP
 
     return WorldToScreen(worldPos, worldToCam, camProj) * 0.5 + 0.5;
 }
+
+#endif

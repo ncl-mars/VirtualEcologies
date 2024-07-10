@@ -11,6 +11,9 @@
     //               https://github.com/ashima/webgl-noise
     //               https://github.com/stegu/webgl-noise
 // 
+#ifndef NOISE_GRAD_INCLUDED
+#define NOISE_GRAD_INCLUDED
+
 // glsl style mod
 #define mod(x, y) (x - y * floor(x / y))
 
@@ -786,8 +789,7 @@ float4 FbmD( in float3 x, int octaves )
     return float4(a, d);
 }
 
-
-
+#endif
 
 
 

@@ -10,6 +10,9 @@
 
 */
 
+
+#ifndef INTERSECTORS_INCLUDED
+#define INTERSECTORS_INCLUDED
 // ------------------------------------------------------------------- Grid Cell Intersect
 // Calcs intersection and exit distances, and normal at intersection.
 // The ray must be in box/object space. If you have multiple boxes all
@@ -116,3 +119,5 @@ float IPlane( in float3 ro, in float3 rd, in float4 p ){
     
     return -(dot(ro,p.xyz)+p.w)/dot(rd,p.xyz);
 }
+
+#endif

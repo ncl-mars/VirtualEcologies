@@ -6,107 +6,110 @@ https://www.shadertoy.com/view/XllGW4
 */
 //--------------------------------------------------------------------- Base
 //
-float3 Erot(in float3 p, in float3 ax, in float ro) {
-    return lerp(dot(p,ax)*ax,p,cos(ro))+sin(ro)*cross(ax,p);
-}
 
-//
-float4x4 RotationAxisAngle(in float3 v, in float angle){
-    float s = sin( angle );
-    float c = cos( angle );
-    float ic = 1.0 - c;
+#ifndef TRANSFORM_UTILS_INCLUDED
+    #define TRANSFORM_UTILS_INCLUDED
 
-    return float4x4(v.x*v.x*ic + c,     v.y*v.x*ic - s*v.z, v.z*v.x*ic + s*v.y, 0.0,
-                    v.x*v.y*ic + s*v.z, v.y*v.y*ic + c,     v.z*v.y*ic - s*v.x, 0.0,
-                    v.x*v.z*ic - s*v.y, v.y*v.z*ic + s*v.x, v.z*v.z*ic + c,     0.0,
-                    0.0,                0.0,                0.0,                1.0 );
-}
+    float3 Erot(in float3 p, in float3 ax, in float ro) {
+        return lerp(dot(p,ax)*ax,p,cos(ro))+sin(ro)*cross(ax,p);
+    }
 
-//
-float4x4 Translate(in float x, in float y, in float z){
-    return float4x4(1.0, 0.0, 0.0, 0.0,
-                    0.0, 1.0, 0.0, 0.0,
-                    0.0, 0.0, 1.0, 0.0,
-                    x,   y,   z,   1.0 );
-}
+    //
+    float4x4 RotationAxisAngle(in float3 v, in float angle){
+        float s = sin( angle );
+        float c = cos( angle );
+        float ic = 1.0 - c;
 
-//
-float2x2 Rot2D(in float a) {
-    return float2x2(cos(a),-sin(a),sin(a),cos(a));
-}
+        return float4x4(v.x*v.x*ic + c,     v.y*v.x*ic - s*v.z, v.z*v.x*ic + s*v.y, 0.0,
+                        v.x*v.y*ic + s*v.z, v.y*v.y*ic + c,     v.z*v.y*ic - s*v.x, 0.0,
+                        v.x*v.z*ic - s*v.y, v.y*v.z*ic + s*v.x, v.z*v.z*ic + c,     0.0,
+                        0.0,                0.0,                0.0,                1.0 );
+    }
 
-float3x3 Rot3D(in float3 angles) {
-    float3 c = cos(angles);
-    float3 s = sin(angles);
-    float3x3 rotX = float3x3(1.0, 0.0, 0.0, 0.0, c.x, s.x, 0.0, -s.x, c.x);
-    float3x3 rotY = float3x3(c.y, 0.0, -s.y, 0.0, 1.0, 0.0, s.y, 0.0, c.y);
-    float3x3 rotZ = float3x3(c.z, s.z, 0.0, -s.z, c.z, 0.0, 0.0, 0.0, 1.0);
-    return rotX * rotY * rotZ;
-}
+    //
+    float4x4 Translate(in float x, in float y, in float z){
+        return float4x4(1.0, 0.0, 0.0, 0.0,
+                        0.0, 1.0, 0.0, 0.0,
+                        0.0, 0.0, 1.0, 0.0,
+                        x,   y,   z,   1.0 );
+    }
 
-//--------------------------------------------------------------------- Extras
-// Return 4x4 rotation X matrix, angle in radians
-float4x4 Rot4X(in float a) {
-    float c = cos( a );
-    float s = sin( a );
-    return float4x4(1, 0, 0, 0,
-                    0, c,-s, 0,
-                    0, s, c, 0,
-                    0, 0, 0, 1);
-}
+    //
+    float2x2 Rot2D(in float a) {
+        return float2x2(cos(a),-sin(a),sin(a),cos(a));
+    }
 
-// Return 4x4 rotation Y matrix, angle in radians
-float4x4 Rot4Y(in float a) {
-    float c = cos( a );
-    float s = sin( a );
-    return float4x4(c, 0, s, 0,
-                    0, 1, 0, 0,
-                    -s, 0, c, 0,
-                    0, 0, 0, 1);
-}
+    float3x3 Rot3D(in float3 angles) {
+        float3 c = cos(angles);
+        float3 s = sin(angles);
+        float3x3 rotX = float3x3(1.0, 0.0, 0.0, 0.0, c.x, s.x, 0.0, -s.x, c.x);
+        float3x3 rotY = float3x3(c.y, 0.0, -s.y, 0.0, 1.0, 0.0, s.y, 0.0, c.y);
+        float3x3 rotZ = float3x3(c.z, s.z, 0.0, -s.z, c.z, 0.0, 0.0, 0.0, 1.0);
+        return rotX * rotY * rotZ;
+    }
 
-// Return 4x4 rotation Z matrix, angle in radians
-float4x4 Rot4Z(in float a) {
-    float c = cos( a );
-    float s = sin( a );
-    return float4x4(c,-s, 0, 0,
-                    s, c, 0, 0,
-                    0, 0, 1, 0,
-                    0, 0, 0, 1);
-}
+    //--------------------------------------------------------------------- Extras
+    // Return 4x4 rotation X matrix, angle in radians
+    float4x4 Rot4X(in float a) {
+        float c = cos( a );
+        float s = sin( a );
+        return float4x4(1, 0, 0, 0,
+                        0, c,-s, 0,
+                        0, s, c, 0,
+                        0, 0, 0, 1);
+    }
 
+    // Return 4x4 rotation Y matrix, angle in radians
+    float4x4 Rot4Y(in float a) {
+        float c = cos( a );
+        float s = sin( a );
+        return float4x4(c, 0, s, 0,
+                        0, 1, 0, 0,
+                        -s, 0, c, 0,
+                        0, 0, 0, 1);
+    }
 
-// http://stackoverflow.com/questions/349050/calculating-a-lookat-matrix
-float4x4 AxisMatrix(float3 right, float3 up, float3 forward)
-{
-    float3 xaxis = right;
-    float3 yaxis = up;
-    float3 zaxis = forward;
-    return float4x4(
-		xaxis.x, yaxis.x, zaxis.x, 0,
-		xaxis.y, yaxis.y, zaxis.y, 0,
-		xaxis.z, yaxis.z, zaxis.z, 0,
-		0, 0, 0, 1
-	);
-}
-
-float4x4 LookAt4x4(float3 forward, float3 up)
-{
-    float3 xaxis = normalize(cross(forward, up));
-    float3 yaxis = up;
-    float3 zaxis = forward;
-    return AxisMatrix(xaxis, yaxis, zaxis);
-}
-
-float4x4 LookAt4x4(float3 at, float3 eye, float3 up)
-{
-    float3 zaxis = normalize(at - eye);
-    float3 xaxis = normalize(cross(up, zaxis));
-    float3 yaxis = cross(zaxis, xaxis);
-    return AxisMatrix(xaxis, yaxis, zaxis);
-}
+    // Return 4x4 rotation Z matrix, angle in radians
+    float4x4 Rot4Z(in float a) {
+        float c = cos( a );
+        float s = sin( a );
+        return float4x4(c,-s, 0, 0,
+                        s, c, 0, 0,
+                        0, 0, 1, 0,
+                        0, 0, 0, 1);
+    }
 
 
+    // http://stackoverflow.com/questions/349050/calculating-a-lookat-matrix
+    float4x4 AxisMatrix(float3 right, float3 up, float3 forward){
+
+        float3 xaxis = right;
+        float3 yaxis = up;
+        float3 zaxis = forward;
+        return float4x4(
+            xaxis.x, yaxis.x, zaxis.x, 0,
+            xaxis.y, yaxis.y, zaxis.y, 0,
+            xaxis.z, yaxis.z, zaxis.z, 0,
+            0, 0, 0, 1
+        );
+    }
+
+    float4x4 LookAt4x4(float3 forward, float3 up){
+
+        float3 xaxis = normalize(cross(forward, up));
+        float3 yaxis = up;
+        float3 zaxis = forward;
+        return AxisMatrix(xaxis, yaxis, zaxis);
+    }
+
+    float4x4 LookAt4x4(float3 at, float3 eye, float3 up){
+
+        float3 zaxis = normalize(at - eye);
+        float3 xaxis = normalize(cross(up, zaxis));
+        float3 yaxis = cross(zaxis, xaxis);
+        return AxisMatrix(xaxis, yaxis, zaxis);
+    }
+#endif
 
 
 

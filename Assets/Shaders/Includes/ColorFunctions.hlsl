@@ -1,6 +1,7 @@
-///////////////////////////////////////////////////////////////////////
-// Color Functions
-// https://www.shadertoy.com/view/lsS3Wc
+
+#ifndef COLOR_FUNC_INCLUDED
+#define COLOR_FUNC_INCLUDED
+
 float3 ThermalGradient(in float fac){
     float3 c=sin(fac*1.5-float3(-.3,.2,.7));
     return c * c;
@@ -87,6 +88,10 @@ fixed3 Saturation(fixed3 rgb, float fac)
     float luma = dot(rgb, float3(0.2125, 0.7154, 0.0721));
     return lerp((float3)luma, rgb, (float3)fac * 5.);
 }
+
+#endif
+
+
 
 
 // vibrance

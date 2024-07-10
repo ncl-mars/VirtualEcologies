@@ -1,6 +1,10 @@
 /*
     READINGS : https://en.wikipedia.org/wiki/Configuration_space_(physics)
 */
+
+#ifndef GENERATORS_INCLUDED
+#define GENERATORS_INCLUDED
+
 // dispatch / compute dimensions
 #ifndef TARGET_DIM
     #define TARGET_DIM float3(512,512,1)
@@ -144,6 +148,7 @@ float2 SMin( float a, float b, float k ){
     return (a<b) ? float2(a-s,m) : float2(b-s,1.0-m);
 }
 
+#endif
 
 
 
