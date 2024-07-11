@@ -20,8 +20,8 @@ namespace Custom.Particles.PlaneField
         private readonly RenderTexture[] buffers;
         public RenderTexture[] Buffers{get=>buffers;}
 
-        public RenderTexture Positions{ get=>buffers[0];}
-        public RenderTexture Velocities{get=>buffers[1];}
+        public RenderTexture Positions{ get=>buffers[0];set=>buffers[0] = value;}
+        public RenderTexture Velocities{get=>buffers[1];set=>buffers[1] = value;}
 
         public ParticlesBuffers(ParticlesSimulation simulation, ParticlesSceneObjects scene)
         {
@@ -51,7 +51,7 @@ namespace Custom.Particles.PlaneField
                 randPos = trs.localToWorldMatrix.MultiplyPoint(randPos);
                 
                 Vector4 velocity = new(0,0,0,-1);
-                Vector4 position = new(randPos.x, randPos.y, randPos.z, 1);
+                Vector4 position = new(randPos.x, randPos.y, randPos.z, 0);
 
                 tmpBuffers[0].SetPixel(X, Y, position);
                 tmpBuffers[1].SetPixel(X, Y, velocity);
@@ -124,6 +124,8 @@ namespace Custom.Particles.PlaneField
         private ParticlesBuffers particles;
         public override RenderTexture[] Buffers{get => particles.Buffers;}
 
+        private RenderTexture target;
+
         const int fieldsIndex = 8; // in uvb, end of "params uniforms"
 
         private ParticlesSceneObjects scene;
@@ -153,6 +155,7 @@ namespace Custom.Particles.PlaneField
             InitSceneData();
 
             particles = new ParticlesBuffers(this, scene);
+            target = new(particles.Positions);
 
             InitMaterial();
             RegisterSceneObjects();
@@ -247,13 +250,11 @@ namespace Custom.Particles.PlaneField
                 hasMatrixUpdate = false;
             }
 
-            RenderTexture.active = null;
-
-            // material.SetTexture(MateProps.buffers[0], particles.Positions);     // position
-            // material.SetTexture(MateProps.buffers[1], particles.Velocities);    // velocity
-
-            Graphics.Blit(null, particles.Velocities, material, 0);
-            Graphics.Blit(null, particles.Positions, material, 1);
+            RenderTexture.active = target;            
+            Graphics.Blit(null, target, material, 0);
+            Graphics.Blit(target, particles.Velocities);
+            Graphics.Blit(null, target, material, 1);
+            Graphics.Blit(target, particles.Positions);
         }
         
         public override void Dispose()

@@ -24,11 +24,12 @@ Blend SrcAlpha OneMinusSrcAlpha
 
 Pass
 {
+    AlphaTest Greater 0.1
     CGPROGRAM
     #pragma vertex vert
     #pragma fragment frag
     
-    #pragma shader_feature _ALTI_PATH _GRAV_TOPO _PLATEFORM
+    #pragma multi_compile _ALTI_PATH _GRAV_TOPO _PLATEFORM
 
     #include "UnityCG.cginc"
     #include "../Includes/Quads.hlsl"
@@ -69,11 +70,11 @@ Pass
 
 
     UNITY_DECLARE_TEX2DARRAY(_Sprites);
+    // Texture2DArray _Sprites;
+
     Texture2D _NoiseTex;
     Texture2D _BumpMap;
     SamplerState SamplerLinearRepeat;
-
-    // StructuredBuffer<ParticleData> _Particles;
 
     float4 _GV;
     #define _NumParticles   (int)_GV.x
@@ -102,14 +103,13 @@ Pass
 
         v2f o;
         float3 pos = v.vertex.xyz; // vertex is world pos
-        // ParticleData data = _Particles[id];
         
         uint2 id2 = IdtToPtc(id, _Positions_TexelSize.zw);
         ParticleData data = UnpackBuffers(id2); 
 
         //--------------------------------------------- apply S,R,T
         pos *= _Trs0[1] * REND_SCALE;
-        // pos *= saturate(ceil(Dot2(data.vel))); // hide if no velocity
+        pos *= saturate(ceil(Dot2(data.vel))); // hide if no velocity
 
         if(_Trs0[0] < 3.5){
             pos = -mul((float3x3)unity_CameraToWorld, pos);

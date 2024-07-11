@@ -18,7 +18,7 @@
     // Buffers
     Texture2D<float4> _Positions;
     Texture2D<float4> _Velocities;
-
+    
     float4 _Positions_TexelSize;
 
     ParticleData UnpackBuffers(uint2 id)
@@ -30,37 +30,28 @@
         P.pos = pos.xyz;
         P.vel = vel.xyz;
 
-        float enc = vel.w;
-
-        float zone = int(enc) * 0.001;
-        float life = abs(frac(enc));
-
-        P.zone = zone;
-        P.life = life;
+        P.zone = vel.w;
+        P.life = pos.w;
 
         return P;
     }
 
-    float4 PackVelocity(ParticleData P)
+    float4 PackVelocity(in ParticleData P)
     {
-        float enc = clamp(P.life, 0, 0.99999);
-        float zone = int(P.zone * 1000);
-        enc += zone;
-
-        return float4(P.vel.xyz, enc);
+        return float4(P.vel.xyz, P.zone);
     }
-
 
     // SIMULATION
     #ifdef SIMULATION
-
-        #ifndef EmitterData
-            struct _DefaultEmitter
-            {
-                float4x4 txx;
-            };
-            #define EmitterData _DefaultEmitter
-        #endif
+        uint3 GetIds(float2 uv)
+        {
+            uint3 ids;
+            ids.xy = floor(uv * _Positions_TexelSize.zw);
+            ids.z = PtcToIdt(ids.xy, _Positions_TexelSize.zw);
+    
+            clip(ids.z < (uint) _Settings[0]);
+            return ids;
+        }
 
         void ApplyAcceleration(inout float3 vel, float3 acc){
 
@@ -83,8 +74,6 @@
         }
 
     #endif
+
 #endif
-
-
-// RENDERER
 

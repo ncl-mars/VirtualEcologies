@@ -82,10 +82,10 @@ float4x4 _UMB[NUM_FIELDS * 2 + NUM_EMITTERS];
 #define WorldToField(id) _UMB[id * 2]
 #define FieldToWorld(id) _UMB[id * 2 + 1]
 
+#define FieldWorldPos(id) FieldToWorld(id)._m03_m13_m23
+
 #define EmitterToWorld(id) _UMB[NUM_FIELDS * 2 + id]
 
-
-#define FieldWorldPos(id) FieldToWorld(id)._m03_m13_m23
 
 // TODO : Atlas FallBack
 #ifdef _FIELD_TEXARRAY 
@@ -99,7 +99,6 @@ float4x4 _UMB[NUM_FIELDS * 2 + NUM_EMITTERS];
 #define SIMULATION
 #include "../Includes/Particles.hlsl"
 
-// RWStructuredBuffer<ParticleData> _Particles;
 
 #define DomainPos(pos) (pos - _Origin.xyz) / MinComp(_Extents.xyz);
 
@@ -186,6 +185,15 @@ float GetBoidNoise(uint id, float timeScl){
     float noiseBoid = _NoiseTex[posNoise * _NoiseTexSize.xy].r;
     return noiseBoid; 
 }
+void ResetPosition(inout float3 pos, uint id){
+
+    float4x4 emittToWorld = EmitterToWorld(id % NUM_EMITTERS);
+
+    float3 rand = Hash31(id * 10);
+    pos = rand * 2 - 1; // Should be a texture !
+    pos = mul(emittToWorld, float4(pos * 0.5, 1)).xyz;
+}
+
 bool CheckReset(uint id, inout ParticleData P){
 
     float3 bounds = max(abs(P.pos - _Origin.xyz) - _Extents.xyz, 0);
@@ -193,25 +201,18 @@ bool CheckReset(uint id, inout ParticleData P){
     // out bounds
     if( (Dot2(bounds) > 0.001) || P.life < 0.0001){
 
-        float4x4 emittToWorld = EmitterToWorld(id % (int)_Settings[1]);
-
-        float3 rand = Hash31(id * 10);
-        P.pos = rand * 2 - 1; // Should be a texture !
-        P.pos = mul(emittToWorld, float4(P.pos * 0.5, 1)).xyz;
-        
         #if  PLATEFORM
             P.vel = normalize(rand * 2 - 1) * _Sim[0];
         #else    
             P.vel = 0;
         #endif
 
-        P.life = 0.5 + rand.x * 0.5;
-        P.zone = -1;
+        P.zone = -(NUM_FIELDS + 1);
         return true;
     }
     else return false;
 }
-bool GetState(uint id){
+float GetState(uint id){
 
     return 1.0 - step(_Times.x, (id / _Settings.x) * _Times.z); // time sequencing
 }
@@ -445,42 +446,31 @@ float3 GetPlateformAttractions(inout ParticleData P, uint id, out PlateformData 
 ////////////////////////////////////////////////////////////////////////////////
 float4 PSPlateform (uint3 ids){
  
-    //--------------------------------------------- Get Buffer
     ParticleData P = UnpackBuffers(ids.xy);
 
-    bool state = GetState(ids.z);
-    if(!state) P.life = 0;
+    if(!CheckReset(ids.z, P))
+    {
+        float3 acc = 0;
+        PlateformData data; float3 fieldPos;
 
-    CheckReset(ids.z, P);
+        acc = GetPlateformAttractions(P, ids.z, data, fieldPos);
 
-    //--------------------------------------------- Get Closets Field
-    float3 acc = 0;
-    PlateformData data; float3 fieldPos;
-
-    acc = GetPlateformAttractions(P, ids.z, data, fieldPos);
-
-    ApplyAcceleration(P.vel, acc);
-
-    P.life -= _Times[1] / _Times[3];
+        ApplyAcceleration(P.vel, acc);
+    }
 
     return PackVelocity(P);
 }
 ////////////////////////////////////////////////////////////////////////////////
 float4 PSAltiPath (uint3 ids){
 
-    //--------------------------------------------- Read Buff
     ParticleData P = UnpackBuffers(ids.xy);
 
-    bool state = GetState(ids.z);
-    if(!state) P.life = 0;
+    if(!CheckReset(ids.z, P))
+    {
 
-    CheckReset(ids.z, P);
-
-    float3 acc = GetPathFieldsAcceleration(P, ids.z);
-
-    ApplyAcceleration(P.vel, acc);
-
-    P.life -= _Times[1] / _Times[3];
+        float3 acc = GetPathFieldsAcceleration(P, ids.z);
+        ApplyAcceleration(P.vel, acc);
+    }
 
     return PackVelocity(P);
 }
@@ -489,20 +479,37 @@ float4 PSGravity (uint3 ids){
  
     ParticleData P = UnpackBuffers(ids.xy);
 
-    bool state = GetState(ids.z);
-    if(!state) P.life = 0;
-
-    CheckReset(ids.z, P);
+    if(!CheckReset(ids.z, P))
+    {
     
-    float3 grav = GetSteer(P.vel, float3(0,-9.8,0)) * _Weights_A[0];
-    ApplyAcceleration(P.vel, grav);
+        float3 grav = GetSteer(P.vel, float3(0,-9.8,0)) * _Weights_A[0];
+        ApplyAcceleration(P.vel, grav);
 
-    CollideGravityFields(P);
+        CollideGravityFields(P);
+    }
     
-    P.life -= _Times[1] / _Times[3];
-
     return PackVelocity(P);
 }
+////////////////////////////////////////////////////////////////////////////////
+float4 PSPosition(uint3 ids){
 
+    float4 pos = _Positions[ids.xy];
+    float4 vel = _Velocities[ids.xy];
 
+    float life = pos.w;
 
+    if(vel.w <= -(NUM_FIELDS + 1))
+    {
+        ResetPosition(pos.xyz, ids.z);
+        life = 1;
+    }
+    else
+    {
+        ApplyVelocity(pos.xyz, vel.xyz);
+        life -= _Times[1] / _Times[3];
+    }
+
+    pos.w = life * GetState(ids.z);
+
+    return pos;
+}

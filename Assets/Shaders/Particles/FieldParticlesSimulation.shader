@@ -12,15 +12,10 @@ CGINCLUDE
     #pragma vertex vert_img
     #pragma fragment frag
 
-    // Texture2D _MainTex;
-    // float4 _MainTex_TexelSize;
-
     #include "./FieldParticlesSimulation.hlsl"
 ENDCG
 
-
 Pass{
-
     Name "VelocityPass"
     CGPROGRAM
 
@@ -28,13 +23,8 @@ Pass{
 
     float4 frag (v2f_img i) : SV_Target
     {
-        uint3 ids;
-        ids.xy = floor(i.uv * _Positions_TexelSize.zw + 0.5);
-        ids.z = PtcToIdt(ids.xy, _Positions_TexelSize.zw);
-
-        // if(ids.z > _Settings[0]) return 0;
-
         float4 vel;
+        uint3 ids = GetIds(i.uv);
 
         #ifdef _ALTI_PATH
             vel = PSAltiPath(ids);
@@ -57,12 +47,7 @@ Pass{
 
     fixed4 frag (v2f_img i) : SV_Target
     {
-        uint2 id = floor(i.uv * _Positions_TexelSize.zw + 0.5);
-        float4 pos = _Positions[id];
-        
-        ApplyVelocity(pos.xyz, _Velocities[id].xyz);
-
-        return pos;
+        return PSPosition(GetIds(i.uv));
     }
     ENDCG
 }

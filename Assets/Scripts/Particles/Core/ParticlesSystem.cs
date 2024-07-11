@@ -16,7 +16,7 @@ namespace Custom.Particles
     ///////////////////////////////////////////////////////////////////////////////////
     public abstract class ParticlesSimulation
     {
-        [SerializeField] protected Material material;
+        protected Material material;
         [SerializeField] protected Vector4[] uvb; // all params encapsulated in a vector array
 
         //--------------------------------------------------------
