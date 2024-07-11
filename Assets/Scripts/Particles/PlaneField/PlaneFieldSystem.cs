@@ -13,7 +13,9 @@ namespace Custom.Particles
     public class PlaneFieldSystem : ParticlesSystem
     {
         // theses are constants to be imported from mono script in inspector
-        public Shader simulationShader;
+        [HideInInspector] public Shader simulationShader;
+        [HideInInspector] public Shader rendererShader;
+        
         public Texture2D noiseTex; // common hash ?
 
         [SerializeField] private PlaneFieldSimulation simulation;

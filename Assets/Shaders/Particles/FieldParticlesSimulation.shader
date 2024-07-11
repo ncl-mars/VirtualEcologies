@@ -1,4 +1,4 @@
-Shader "Particles/Simulation"
+Shader "FieldParticles/Simulation"
 {
 Properties{ // _MainTex ("Texture", 2D) = "white" {}
 }

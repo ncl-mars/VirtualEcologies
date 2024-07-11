@@ -4,7 +4,7 @@
     // https://forum.unity.com/threads/antialiased-grid-lines-fwidth.1010668/
 */
 
-Shader "Helpers/PlaneFieldSystemVisualizer"{
+Shader "FieldParticles/Visualizer"{
 Properties {}
 SubShader {
 Tags { 
@@ -29,7 +29,6 @@ Pass
 
     #pragma target 3.5
 
-    
     #ifdef _1xF
         #define NUM_FIELDS 1
     #elif _2xF

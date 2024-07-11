@@ -35,6 +35,7 @@ namespace Custom.Particles
             }
         }
     
+
         public abstract RenderTexture[] Buffers{get;}
         public Vector4[] UVB{get => uvb; set => uvb = value;}
 
@@ -45,10 +46,8 @@ namespace Custom.Particles
     public abstract class ParticlesRenderer
     {
         // public Camera netCam;
-        [SerializeField] protected Material material;
+        protected Material material;
         [SerializeField] protected Vector4[] uvb;
-
-        protected RenderParams renderParams;
         
         public abstract void Dispose();
 

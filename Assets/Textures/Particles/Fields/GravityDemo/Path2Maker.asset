@@ -17,8 +17,8 @@ MonoBehaviour:
     - texture: {fileID: 0}
       readRotation: 1
     heightSources:
-    - texture: {fileID: 2800000, guid: 24dbb0297e1987f499fc58c1ca3a1e28, type: 2}
-      isClamped: 0
+    - texture: {fileID: 2800000, guid: 47ad8baa7de859349a3d36862a2c0746, type: 3}
+      isClamped: 1
   generation:
     mapType: 16
     targetResolution: {x: 512, y: 512}

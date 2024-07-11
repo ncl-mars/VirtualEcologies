@@ -39,13 +39,13 @@ namespace Custom.Particles.PlaneField
             internal static readonly int uvb      = Shader.PropertyToID("_UVB");
         }
 
-
         private const int uvb_length = 16;
 
         [SerializeField] private Texture[] textures = new Texture[1];
-        [SerializeField] protected Texture2DArray spriteCollection;
+        [SerializeField] protected Texture2DArray sprites;
 
         protected Mesh mesh;
+        protected RenderParams renderParams;
 
         public PlaneFieldRenderer()
         {
@@ -53,57 +53,48 @@ namespace Custom.Particles.PlaneField
             uvb = (uvb.Length != uvb_length) ? new Vector4[uvb_length] : uvb;
         }
 
-        public void Init(ParticlesSystem system, ParticlesSceneObjects scene)
+        public void Init(ParticlesSystem system, ParticlesSceneObjects scene, Camera cam = null)
         {
             mesh = MeshUtils.CreateQuad();
 
             DomainTransform = scene.domain.transform;   // 2 : origin, 3: extents
             uvb[2][3] = system.transform.lossyScale.y;
 
-            renderParams = InitRendererParams(system);
+            renderParams = InitRenderer(system as PlaneFieldSystem, cam);
         }
 
-        public RenderParams InitRendererParams(ParticlesSystem system)
+        public RenderParams InitRenderer(PlaneFieldSystem system, Camera cam)
         {
             PlaneFieldSimulation simulation = system.Simulation as PlaneFieldSimulation;
-            Material i_material = GameObject.Instantiate(material);
+            material = new Material(system.rendererShader);
 
-            i_material.EnableKeyword(MateProps.k_modes[simulation.Mode.GetIndex()]);
+            material.EnableKeyword(MateProps.k_modes[simulation.Mode.GetIndex()]);
 
-            RenderParams rp = new(i_material)
+            RenderParams rp = new(material)
             {
+                camera = cam,
                 layer = system.gameObject.layer,
                 worldBounds = new Bounds(simulation.Origin, simulation.Extents * 2),
                 shadowCastingMode = ShadowCastingMode.Off,
                 receiveShadows = false,
-                matProps = new()
+                // matProps = new()
             };
 
+            material.SetTexture(MateProps.buffers[0], simulation.Buffers[0]); // position
+            material.SetTexture(MateProps.buffers[1], simulation.Buffers[1]); // velocity
+            material.SetTexture(MateProps.sprites, sprites);
 
-            rp.matProps.SetTexture(MateProps.buffers[0], simulation.Buffers[0]); // position
-            rp.matProps.SetTexture(MateProps.buffers[1], simulation.Buffers[1]); // velocity
+            material.SetVector(MateProps.gvb, new Vector4(simulation.MaxCount, sprites.depth));
+            material.SetVectorArray(MateProps.uvb, uvb);
 
-            rp.matProps.SetTexture(MateProps.sprites, spriteCollection);
-
-            if(textures[0] != null) rp.matProps.SetTexture(MateProps.maps[0], textures[0]);
-
-            rp.matProps.SetVector(
-                MateProps.gvb, 
-                new Vector4(simulation.MaxCount, spriteCollection.depth) 
-            );
-
-            rp.matProps.SetVectorArray(MateProps.uvb, uvb);
+            if(textures[0]!=null) material.SetTexture(MateProps.maps[0], textures[0]);
 
             return rp;
         }
 
-        public RenderParams Update(ParticlesSimulation simulation)
+        public void Update(ParticlesSimulation simulation)
         {
-            renderParams.matProps.SetTexture(MateProps.buffers[0], simulation.Buffers[0]); // position
-            renderParams.matProps.SetTexture(MateProps.buffers[1], simulation.Buffers[1]); // velocity
-            renderParams.matProps.SetVectorArray(MateProps.uvb, uvb);
-            
-            return renderParams;
+            material.SetVectorArray(MateProps.uvb, uvb);
         }
 
         public void Draw(int drawCount)
@@ -114,6 +105,7 @@ namespace Custom.Particles.PlaneField
         public override void Dispose(){}
 
 
+        //---------------------------------------------------------------------- Editor
 #if UNITY_EDITOR
         public void RecreateSerializedVectors()
         {

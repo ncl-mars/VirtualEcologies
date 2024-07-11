@@ -6,7 +6,7 @@
     // AlphaTest Greater [_Cutoff]
 */
 
-Shader "Particles/FieldParticles"{
+Shader "FieldParticles/Renderer"{
 Properties
 {
     [Header(Input Textures)][Space(10)]
@@ -24,7 +24,7 @@ Blend SrcAlpha OneMinusSrcAlpha
 
 Pass
 {
-    AlphaTest Greater 0.1
+    // AlphaTest Greater 0.1
     CGPROGRAM
     #pragma vertex vert
     #pragma fragment frag
@@ -42,7 +42,6 @@ Pass
     #define PI 3.14159265359
 
     //======================================================= Struct
-    // https://docs.unity3d.com/Manual/SL-VertexFragmentShaderExamples.html
     struct appdata{
 
         float4 vertex : POSITION;
@@ -150,7 +149,6 @@ Pass
             o.tspace1 = half3(xa.y, ya.y, za.y);
             o.tspace2 = half3(xa.z, ya.z, za.z);
         }
-
         
         pos += data.pos;
         //---------------------------------------------
@@ -226,8 +224,6 @@ Pass
 
     fixed4 frag (v2f i, uint id : SV_InstanceID) : SV_Target{
 
-        // return 1;
-
         //---------------------------------------------
         uint2 dim = pow((float)_NumParticles, 0.5);
         float2 posBoid = PtcToNtc(IdtToPtc(id, dim), dim);
@@ -236,7 +232,8 @@ Pass
         float slice = (noise * 20.0) % _NumSprites;
         slice = floor(slice);
 
-        fixed4 col = UNITY_SAMPLE_TEX2DARRAY(_Sprites, float3(i.uv, slice) );
+        float2 uv = float2(1-i.uv.x, i.uv.y);
+        fixed4 col = UNITY_SAMPLE_TEX2DARRAY(_Sprites, float3(uv, slice) );
         clip(col.a - _Settings[0]); // discard on alpha
 
 
@@ -247,7 +244,6 @@ Pass
         col = i.color;
 
         col.rgb = GetLights(i, P);
-
 
         return col;
     }

@@ -177,7 +177,7 @@ namespace Custom.Particles.PlaneField
             if(property.name == "mode") container.Insert(0,CreateSimulationModeEnum(property));
 
             else if(property.name == "material")            container.Q("set").Insert(0,new PropertyField(property));
-            else if(property.name == "spriteCollection")    container.Q("set").Insert(1,new PropertyField(property));
+            else if(property.name == "sprites")    container.Q("set").Insert(1,new PropertyField(property));
             
             else base.AddProperty(container, property);
         }
