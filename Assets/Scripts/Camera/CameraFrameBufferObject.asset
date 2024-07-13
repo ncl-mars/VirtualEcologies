@@ -14,5 +14,5 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   material: {fileID: 2100000, guid: 8f557f701cfc2fb4eb9eb5feb600c368, type: 2}
   noise: {fileID: 2800000, guid: f1d4aa160a73f6b409034d2caeb2c6b3, type: 2}
-  uvb: {x: 0, y: 0, z: 0, w: 0}
+  mixBuffer: 0.837
   layer: 3

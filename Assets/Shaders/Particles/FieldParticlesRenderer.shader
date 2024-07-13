@@ -56,8 +56,6 @@ Pass
         uint id         : SV_InstanceID;
         float4 color    : COLOR0;
 
-        // float3 nor      : NORMAL;
-
         // hold a 3x3 rotation matrix that transforms from tangent to world space
         half3 tspace0 : TEXCOORD1; // tangent.x, bitangent.x, normal.x
         half3 tspace1 : TEXCOORD2; // tangent.y, bitangent.y, normal.y
@@ -108,7 +106,7 @@ Pass
 
         //--------------------------------------------- apply S,R,T
         pos *= _Trs0[1] * REND_SCALE;
-        pos *= saturate(ceil(Dot2(data.vel))); // hide if no velocity
+        // pos *= saturate(ceil(Dot2(data.vel))); // hide if no velocity
 
         if(_Trs0[0] < 3.5){
             pos = -mul((float3x3)unity_CameraToWorld, pos);

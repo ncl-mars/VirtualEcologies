@@ -21,11 +21,11 @@ CGPROGRAM
     #include "../Includes/ColorFunctions.hlsl"
 
     sampler2D _MainTex;
-
+    float _MixBuffer;
     
     fixed4 frag(v2f_img i) : SV_Target
     {
-        fixed4 col = tex2D(_MainTex, i.uv) * 0.95;
+        fixed4 col = tex2D(_MainTex, i.uv) * _MixBuffer;
         return col;
     }
 

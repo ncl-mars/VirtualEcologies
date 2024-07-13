@@ -364,6 +364,7 @@ float3 GetPathAcceleration(inout ParticleData P, float3 fieldPos, uint idField, 
 }
 float3 GetPathFieldsAcceleration(inout ParticleData P, uint id){
 
+    float3 acc = 0;
     int curZoneID = 0;
     float distance;
 
@@ -371,11 +372,15 @@ float3 GetPathFieldsAcceleration(inout ParticleData P, uint id){
         curZoneID = floor(P.zone);
     #endif
 
-    float3 fieldPos = mul(WorldToField(curZoneID), float4(P.pos, 1)).xyz * 2.0;
-    bool clip = Dot2(floor(abs(fieldPos))) < 0.5; // in field space
-    float3 acc = 0;
+    bool clip = false;
+    float3 fieldPos;
 
-    // if still inside zone, return path acc
+    if(curZoneID >= 0)
+    {
+        fieldPos = mul(WorldToField(curZoneID), float4(P.pos, 1)).xyz * 2.0;
+        clip = Dot2(floor(abs(fieldPos))) < 0.5; // in field space
+    }
+
     if(clip) 
     {
         distance = length(P.pos - FieldWorldPos(curZoneID));
@@ -393,10 +398,10 @@ float3 GetPathFieldsAcceleration(inout ParticleData P, uint id){
 
             if(idClosest != curZoneID)
             {
-                float3 fieldPos = mul(WorldToField(idClosest), float4(P.pos, 1)).xyz * 2.0;
+                fieldPos = mul(WorldToField(idClosest), float4(P.pos, 1)).xyz * 2.0;
 
                 const float padding = 0.1;
-                bool clip = Dot2(floor(abs(fieldPos) + padding)) < 0.5; // in field space
+                clip = Dot2(floor(abs(fieldPos) + padding)) < 0.5; // in field space
 
                 if(clip){
                     curZoneID = idClosest; // update current zone if inside
@@ -407,8 +412,8 @@ float3 GetPathFieldsAcceleration(inout ParticleData P, uint id){
             }
         #endif
     }
-
     P.zone = curZoneID + min( distance/(MaxComp(_Extents.xyz) * 2.0), 0.999);
+
     return acc;
 }
 
@@ -517,7 +522,6 @@ float4 PSAltiPath (uint3 ids){
 
     if(!CheckReset(ids.z, P))
     {
-
         float3 acc = GetPathFieldsAcceleration(P, ids.z);
         ApplyAcceleration(P.vel, acc);
     }
