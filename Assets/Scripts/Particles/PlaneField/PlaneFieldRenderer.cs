@@ -1,4 +1,5 @@
 using System;
+using UnityEditor;
 using UnityEngine;
 using UnityEngine.Rendering;
 
@@ -42,10 +43,12 @@ namespace Custom.Particles.PlaneField
         private const int uvb_length = 16;
 
         [SerializeField] private Texture[] textures = new Texture[1];
-        [SerializeField] protected Texture2DArray sprites;
+        [SerializeField] private Texture2DArray sprites;
 
-        protected Mesh mesh;
-        protected RenderParams renderParams;
+        private Mesh mesh;
+        private RenderParams renderParams;
+
+        [SerializeField] private CameraFrameBufferObject frameBuffer;
 
         public PlaneFieldRenderer()
         {
@@ -53,18 +56,20 @@ namespace Custom.Particles.PlaneField
             uvb = (uvb.Length != uvb_length) ? new Vector4[uvb_length] : uvb;
         }
 
-        public void Init(ParticlesSystem system, ParticlesSceneObjects scene, Camera cam = null)
+        public void Init(ParticlesSystem system, ParticlesSceneObjects scene)
         {
             mesh = MeshUtils.CreateQuad();
 
             DomainTransform = scene.domain.transform;   // 2 : origin, 3: extents
             uvb[2][3] = system.transform.lossyScale.y;
 
-            renderParams = InitRenderer(system as PlaneFieldSystem, cam);
+            renderParams = InitRenderer(system as PlaneFieldSystem);
         }
 
-        public RenderParams InitRenderer(PlaneFieldSystem system, Camera cam)
+        public RenderParams InitRenderer(PlaneFieldSystem system)
         {
+            Camera cam = InitFBO(system.gameObject);
+
             PlaneFieldSimulation simulation = system.Simulation as PlaneFieldSimulation;
             material = new Material(system.rendererShader);
 
@@ -92,6 +97,27 @@ namespace Custom.Particles.PlaneField
             return rp;
         }
 
+        public Camera InitFBO(GameObject systemObject)
+        {
+            GameObject mainCamObject = GameObject.FindGameObjectWithTag("MainCamera");
+            Camera cam = null;
+
+            if(frameBuffer)
+            {
+                if(mainCamObject.TryGetComponent(out CameraFrameBuffers frameBuffers))
+                {
+                    if(!frameBuffers.Active) return null;
+
+                    frameBuffers.RegisterFrameBuffer(frameBuffer, this);
+                    systemObject.layer = frameBuffer.Layer;
+                    cam = frameBuffer.Cam;
+                }
+            }
+
+            return cam;
+        }
+
+        //---------------------------------------------------------------------- Runtime
         public void Update(ParticlesSimulation simulation)
         {
             material.SetVectorArray(MateProps.uvb, uvb);

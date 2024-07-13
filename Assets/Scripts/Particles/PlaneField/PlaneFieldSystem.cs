@@ -24,8 +24,8 @@ namespace Custom.Particles
         [SerializeField] new private PlaneFieldRenderer renderer;
         public override ParticlesRenderer Renderer{get=>renderer;}
 
-        private void OnEnable() { Init(); }
-        private void OnDisable(){ Dispose();}
+        private void Start() { Init(); }
+        private void OnDestroy(){ Dispose();}
 
         private void Init()
         {

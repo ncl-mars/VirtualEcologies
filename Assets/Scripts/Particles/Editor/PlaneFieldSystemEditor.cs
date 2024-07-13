@@ -67,6 +67,7 @@
  63 - DistanceToClosestZone, DistanceToOrigin, Velocity, BillBoard, Velocity_Cam, Velocity_Yup
  64 - 64
 */
+
 using UnityEditor;
 using UnityEngine;
 using UnityEditor.UIElements;
@@ -175,9 +176,9 @@ namespace Custom.Particles.PlaneField
         protected override void AddProperty(VisualElement container, SerializedProperty property)
         {
             if(property.name == "mode") container.Insert(0,CreateSimulationModeEnum(property));
-
-            else if(property.name == "material")            container.Q("set").Insert(0,new PropertyField(property));
-            else if(property.name == "sprites")    container.Q("set").Insert(1,new PropertyField(property));
+            else if(property.name == "material") container.Q("set").Insert(0,new PropertyField(property));
+            else if(property.name == "sprites") container.Q("set").Insert(0,new PropertyField(property));
+            else if(property.name == "frameBuffer") container.Q("set").Insert(0,new PropertyField(property));
             
             else base.AddProperty(container, property);
         }

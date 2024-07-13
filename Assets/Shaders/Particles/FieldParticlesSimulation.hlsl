@@ -193,7 +193,6 @@ void ResetPosition(inout float3 pos, uint id){
     pos = rand * 2 - 1; // Should be a texture !
     pos = mul(emittToWorld, float4(pos * 0.5, 1)).xyz;
 }
-
 bool CheckReset(uint id, inout ParticleData P){
 
     float3 bounds = max(abs(P.pos - _Origin.xyz) - _Extents.xyz, 0);
@@ -201,8 +200,9 @@ bool CheckReset(uint id, inout ParticleData P){
     // out bounds
     if( (Dot2(bounds) > 0.001) || P.life < 0.0001){
 
-        #if  PLATEFORM
-            P.vel = normalize(rand * 2 - 1) * _Sim[0];
+        #if _PLATEFORM
+            float3 rand = Hash31(id * 10);
+            P.vel = normalize(rand * 2 - 1) * _Sim[0] * 0.1;
         #else    
             P.vel = 0;
         #endif
@@ -253,7 +253,57 @@ float3 RandomizeFieldPosition(int idField, uint id){
 }
 
 //------------------------------------------------------------ Gravity Collide
+bool CollideGravityField(uint idField, inout ParticleData P, inout uint idClosest, inout float distance){
+
+    float d = Dot2(P.pos-FieldWorldPos(idField));
+
+    if(d < distance)
+    {
+        distance = d;
+        idClosest = idField;
+    }
+
+    float3 fieldPos = mul(WorldToField(idField), float4(P.pos, 1)).xyz * 2.; // fieldPos = normalized field coord, -1 1
+
+    bool clip  = Dot2(floor(abs(fieldPos) + 0.05)) < 0.5; // in field space
+    if(clip)
+    {
+        float2 uv = fieldPos.xy * 0.5  + 0.5;
+        float4 topo = GetTopoData(uv, idField);
+
+        float thresh = 0.0125; // collisions
+        float diff = fieldPos.z - (topo.a + thresh);
+        
+        if(diff < 0)
+        {
+            P.vel = reflect(P.vel, topo.xyz);
+            P.vel *= 1.0 - (_Weights_A[1] * 0.5 + 0.5);
+
+            return true;
+        }
+        return false;
+    }
+    else return false;
+}
 void CollideGravityFields(inout ParticleData P){
+
+    int idClosest = -1;
+    float distance = 1e6;
+
+    #if NUM_FIELDS > 1
+        for(uint f = 0; f < NUM_FIELDS; f++)
+        {
+            if(CollideGravityField(f, P, idClosest, distance)) break;
+        }
+
+    #else
+        CollideGravityField(0, P, idClosest, distance);
+    #endif
+
+    distance = sqrt(distance);
+    P.zone = idClosest + min( distance/(MaxComp(_Extents.xyz) * 2.0), 0.999);
+}
+void CollideClosestGravityField(inout ParticleData P){
 
     int idClosest;
     float distance;
@@ -422,7 +472,7 @@ float3 GetPlateformAttractions(inout ParticleData P, uint id, out PlateformData 
             float3 cro = -normalize(cross(P.vel, fpos));
             float3 tan = normalize(cross(cro, fpos));
 
-            acc += GetSteer(P.vel, tan) * _Weights_B[0]; 
+            acc += GetSteer(P.vel, tan) * _Weights_B[0];
 
             float3 target = FieldWorldPos(idClosest) + normalize(fpos) * FieldData(idClosest)[0] * _Weights_B[2];//* (rand.x * 0.25 + 0.75)
             acc += GetWorldBodyFallofAttraction(P.vel, P.pos, target, distance) * _Weights_B[1];
@@ -475,17 +525,21 @@ float4 PSAltiPath (uint3 ids){
     return PackVelocity(P);
 }
 ////////////////////////////////////////////////////////////////////////////////
+#define COLLIDE_CLOSEST
 float4 PSGravity (uint3 ids){
  
     ParticleData P = UnpackBuffers(ids.xy);
 
     if(!CheckReset(ids.z, P))
     {
-    
         float3 grav = GetSteer(P.vel, float3(0,-9.8,0)) * _Weights_A[0];
         ApplyAcceleration(P.vel, grav);
 
+        #ifdef COLLIDE_CLOSEST
+        CollideClosestGravityField(P);
+        #else
         CollideGravityFields(P);
+        #endif
     }
     
     return PackVelocity(P);
@@ -513,3 +567,7 @@ float4 PSPosition(uint3 ids){
 
     return pos;
 }
+
+
+
+

@@ -1,0 +1,18 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 48ed435f6ba513441bd795c8af4c1fd6, type: 3}
+  m_Name: CameraFrameBufferObject
+  m_EditorClassIdentifier: 
+  material: {fileID: 2100000, guid: 8f557f701cfc2fb4eb9eb5feb600c368, type: 2}
+  noise: {fileID: 2800000, guid: f1d4aa160a73f6b409034d2caeb2c6b3, type: 2}
+  uvb: {x: 0, y: 0, z: 0, w: 0}
+  layer: 3
